@@ -3,17 +3,15 @@ import { Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import HomePage from "./pages/HomePage";
-import TeacherCourse from "./pages/TeacherCourse";
-import TeacherContent from "./pages/TeacherContent";
-import TeacherGroups from "./pages/TeacherGroups";
-import TeacherAssessments from "./pages/TeacherGrading";
-import CourseAttendanceAndSubscriptions from "./pages/CourseAttendanceAndSubscriptions";
-import TeacherCalendar from "./pages/TeacherCalendar";
-import NotificationsAlerts from "./pages/NotificationsAlerts";
-import Profile from "./pages/Profile";
+import ContentManagement from "./pages/ContentManagement";
+import AdminAboutUs from "./pages/AdminAboutUs";
 import AdminTeacherSubscriptions from "./pages/AdminTeacherSubscriptions";
-import TeacherStudentSubscriptions from "./pages/TeacherStudentSubscriptions";
-
+import AdminExtraContent from "./pages/AdminExtraContent";
+import AdminNotifications from "./pages/AdminNotifications";
+import SupportContact from "./pages/SupportContact";
+import AdminPackages from "./pages/AdminPackages";
+import AdminSettings from "./pages/AdminSettings";
+import TeacherRegistration from "./pages/TeacherRegistration";
 
 import "./index.css";
 export default function App() {
@@ -30,29 +28,26 @@ export default function App() {
           <div className="max-w-[1600px] mx-auto">
             <Routes>
               <Route path="/" element={<HomePage />} />
-              <Route path="/teacher-courses" element={<TeacherCourse />} />
-              <Route path="/teacher-content" element={<TeacherContent />} />
-              <Route path="/teacher-groups" element={<TeacherGroups />} />
-              <Route path="/teacher-grading" element={<TeacherAssessments />} />
+              <Route path="/admin-users" element={<AdminExtraContent />} />
+              <Route path="/admin-about" element={<AdminAboutUs />} />
               <Route
-                path="/teacher-grades"
-                element={<CourseAttendanceAndSubscriptions />}
-              />
-              <Route
-                path="/teacher-subscriptions"
-                element={<AdminTeacherSubscriptions />}
+                path="/admin-notifications"
+                element={<AdminNotifications />}
               />
 
-              <Route path="/teacher-calendar" element={<TeacherCalendar />} />
-  <Route
-                path="/teacher-notifications"
-                element={<NotificationsAlerts />}
-              />
               <Route
-                path="/teacher-student-subscriptions"
-                element={<TeacherStudentSubscriptions />}
+                path="/admin-teacher-verification"
+                element={<TeacherRegistration />}
               />
-              <Route path="/teacher-profile" element={<Profile />} />
+
+              <Route path="/admin-comments" element={<SupportContact />} />
+              <Route path="/admin-packages" element={<AdminPackages />} />
+              <Route path="/admin-settings" element={<AdminSettings />} />
+              <Route
+                path="/admin-subscriptions"
+                element={<AdminTeacherSubscriptions />}
+              />
+              <Route path="/admin-content" element={<ContentManagement />} />
             </Routes>
           </div>
         </main>

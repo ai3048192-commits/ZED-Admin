@@ -1,322 +1,320 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { supabase } from "../lib/supabaseClient";
 import {
-  Shield,
-  Check,
-  ArrowRight,
   CreditCard,
-  Smartphone,
-  Sparkles,
   CheckCircle2,
-  Clock,
-  Zap,
-  Award,
-  Crown
+  XCircle,
+  Eye,
+  Trash2,
+  User,
+  FileText,
+  ShieldCheck,
+  X,
+  Mail,
+  Loader2,
+  Package,
+  DollarSign,
+  Phone
 } from "lucide-react";
 
-export default function TeacherSubscriptionPlansPage() {
-  const [selectedPlan, setSelectedPlan] = useState<any>(null);
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState("");
-  const [step, setStep] = useState<"plans" | "checkout" | "success">("plans");
-  const [successMessage, setSuccessMessage] = useState("");
+interface Subscription {
+  id: string;
+  teacherName: string;
+  teacherEmail: string;
+  teacherPhone: string;
+  packageName: string;
+  packagePrice: string;
+  paymentMethod: string;
+  receiptImage: string;
+  date: string;
+  status: "pending" | "approved" | "rejected" | "active";
+}
 
-  // بيانات الباقات (تصاعدية المميزات والأسعار تبدأ من فوق 500)
-  const plans = [
-    {
-      id: 1,
-      name: "الباقة الأساسية للبدء والانطلاق",
-      price: "650",
-      period: "شهرياً",
-      description: "المثالية للمدرسين لبدء رفع الكورسات وإدارة الحصص الأولى.",
-      features: [
-        "إدارة وتصميم حتى 5 كورسات دراسية",
-        "رفع حتى 50 درس فيديو بجودة عالية",
-        "متابعة حضور وغياب حتى 200 طالب",
-        "دعم فني عبر البريد الإلكتروني"
-      ],
-      badge: "بداية قوية",
-      color: "border-slate-200 bg-white"
-    },
-    {
-      id: 2,
-      name: "الباقة المتقدمة (تشمل مميزات الأولى +)",
-      price: "1,450",
-      period: "كل 3 شهور (ربع سنوي)",
-      description: "تشمل جميع مميزات الباقة الأساسية مضافاً إليها أدوات إضافية للتوسع.",
-      features: [
-        "✅ جميع مميزات الباقة الأساسية",
-        "كورسات وفيديوهات بلا حدود (عدد غير محدود)",
-        "إدارة مجموعات طلابية غير محدودة",
-        "نظام تصحيح الواجبات والاختبارات الآلي",
-        "تقارير أداء الطلاب الشاملة",
-        "دعم فني أسرع"
-      ],
-      badge: "الأكثر طلباً ⭐",
-      color: "border-indigo-500 bg-indigo-50/20 shadow-xl scale-105"
-    },
-    {
-      id: 3,
-      name: "الباقة الاحترافية الشاملة (Pro - تشمل كل شيء)",
-      price: "3,200",
-      period: "سنوياً (توفير مضاعف)",
-      description: "الخيار الأضخم للأكاديميات وكبار المعلمين لامتلاك منصة تعليمية متكاملة.",
-      features: [
-        "✅ جميع مميزات الباقة الأولى والثانية",
-        "تخزين سحابي ضخم ومساحة غير محدودة للدروس",
-        "تخصيص كامل للهوية البصرية واسم المنصة الخاصة بك",
-        "أولوية قصوى ودعم فني خاص على مدار الساعة (VIP)",
-        "لوحة إحصائيات مالية وأرباح متقدمة جداً"
-      ],
-      badge: "الاحترافية المطلقة 👑",
-      color: "border-emerald-500 bg-emerald-50/20 shadow-2xl"
-    }
-  ];
+export default function AdminTeacherSubscriptions() {
+  const [successMsg, setSuccessMsg] = useState("");
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSub, setSelectedSub] = useState<Subscription | null>(null);
 
-  const handleProceedToCheckout = (plan: any) => {
-    setSelectedPlan(plan);
-    setStep("checkout");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  const showSuccess = (msg: string) => {
+    setSuccessMsg(msg);
+    setTimeout(() => setSuccessMsg(""), 3500);
   };
 
-  const handleConfirmPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedPaymentMethod) {
-      alert("الرجاء اختيار طريقة دفع واحدة (فودافون كاش أو انستاباي).");
-      return;
+  useEffect(() => {
+    fetchSubscriptions();
+  }, []);
+
+  const fetchSubscriptions = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("teacher_subscriptions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        const formattedData: Subscription[] = data.map((item: any) => ({
+          id: item.id,
+          teacherName: item.teacher_name || "معلم غير محدد",
+          teacherEmail: item.teacher_email || "غير متوفر",
+          teacherPhone: item.teacher_phone || item.phone || "غير متوفر",
+          packageName: item.plan_name || "باقة غير محددة",
+          packagePrice: `${item.amount || 0} ج.م`,
+          paymentMethod: item.payment_method === "vodafone" ? "فودافون كاش" : item.payment_method === "instapay" ? "انستا باي" : item.payment_method,
+          receiptImage: item.receipt_url,
+          date: item.created_at ? new Date(item.created_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) : "وقت غير محدد",
+          status: item.status,
+        }));
+        setSubscriptions(formattedData);
+      }
+    } catch (err: any) {
+      console.error("خطأ في جلب الاشتراكات:", err.message);
+    } finally {
+      setLoading(false);
     }
-    setStep("success");
-    setSuccessMessage("تم استلام إيصال الدفع بنجاح! طلبك الآن قيد المراجعة الفورية من قِبل الأدمن، وسيتم تفعيل وفتح المنصة الكاملة لحسابك خلال ساعات قليلة.");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleApprove = async (subToApprove: Subscription) => {
+    try {
+      // تحديث الحالة إلى active لتفتح لوحة تحكم المعلم فوراً
+      const { error } = await supabase
+        .from("teacher_subscriptions")
+        .update({ status: "active" })
+        .eq("id", subToApprove.id);
+
+      if (error) throw error;
+
+      setSubscriptions(
+        subscriptions.map((sub) =>
+          sub.id === subToApprove.id ? { ...sub, status: "active" } : sub
+        )
+      );
+      
+      showSuccess("تم قبول اشتراك المدرس وتفعيل الباقة وفتح المنصة بنجاح!");
+      setSelectedSub(null);
+    } catch (err: any) {
+      alert("حدث خطأ أثناء تحديث حالة الطلب: " + err.message);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    try {
+      // تحديث الحالة إلى rejected لإبقاق لوحة تحكم المعلم مغلقة
+      const { error } = await supabase
+        .from("teacher_subscriptions")
+        .update({ status: "rejected" })
+        .eq("id", id);
+
+      if (error) throw error;
+
+      setSubscriptions(
+        subscriptions.map((sub) =>
+          sub.id === id ? { ...sub, status: "rejected" } : sub
+        )
+      );
+      showSuccess("تم رفض الاشتراك وإبقاء المنصة مغلقة!");
+      setSelectedSub(null);
+    } catch (err: any) {
+      alert("حدث خطأ أثناء رفض الطلب: " + err.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm("هل أنت متأكد من حذف سجل الاشتراك هذا؟")) {
+      try {
+        const { error } = await supabase
+          .from("teacher_subscriptions")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
+
+        setSubscriptions(subscriptions.filter((sub) => sub.id !== id));
+        showSuccess("تم حذف السجل بنجاح.");
+        setSelectedSub(null);
+      } catch (err: any) {
+        alert("حدث خطأ أثناء الحذف: " + err.message);
+      }
+    }
   };
 
   return (
-    <div className="space-y-8 bg-white text-slate-800 min-h-screen pb-16" dir="rtl">
-      
-      {/* رأس الصفحة */}
-      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 rounded-3xl p-6 sm:p-10 shadow-xl text-white border border-indigo-500/20">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <span className="px-3 py-1 bg-white/25 backdrop-blur-md text-white text-[11px] font-bold rounded-full inline-flex items-center gap-1.5 border border-white/30">
-              <Sparkles size={12} />
-              باقات اشتراك المعلمين في المنصة
-            </span>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-wide">
-              اختر باقتك التعليمية وانطلق بنجاح
-            </h1>
-            <p className="text-xs sm:text-sm text-indigo-200 font-semibold">
-              باقات متدرجة ومصممة خصيصاً لتناسب حجم تدريسك وأكاديميتك على المنصة.
-            </p>
-          </div>
-
-          <Link
-            to="/teacher-dashboard"
-            className="px-5 py-3 bg-white text-slate-900 hover:bg-slate-100 rounded-2xl text-xs font-black shadow-lg transition-all flex items-center gap-2 self-start md:self-auto"
-          >
-            <ArrowRight size={16} />
-            <span>العودة للوحة المعلم</span>
-          </Link>
+    <div className="space-y-8 min-h-screen text-slate-800" dir="rtl">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-purple-800 via-purple-700 to-indigo-800 p-8 rounded-3xl text-white shadow-xl">
+        <div className="space-y-3">
+          <span className="px-3.5 py-1.5 bg-white/25 backdrop-blur-md text-xs font-bold rounded-full inline-flex items-center gap-2 border border-white/20">
+            <CreditCard size={14} />
+            إدارة الاشتراكات المالية
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black">مراجعة اشتراكات المعلمين</h1>
+          <p className="text-purple-100 text-sm">تفاصيل المعلمين، الباقات المختارة، وبيانات الدفع والإيصالات.</p>
         </div>
       </div>
 
-      {/* رسالة نجاح تقديم الطلب والمراجعة */}
-      {successMessage && step === "success" && (
-        <div className="p-8 bg-emerald-50 border-2 border-emerald-200 text-emerald-900 rounded-3xl space-y-4 text-center shadow-lg max-w-2xl mx-auto">
-          <Clock size={56} className="mx-auto text-emerald-600 animate-pulse" />
-          <h2 className="text-xl font-black text-slate-900">جاري مراجعة طلبك وتفعيل المنصة...</h2>
-          <p className="text-xs sm:text-sm font-semibold text-slate-700 leading-relaxed max-w-lg mx-auto">
-            {successMessage}
-          </p>
-          <div className="pt-4">
-            <Link
-              to="/teacher-dashboard"
-              className="px-8 py-3.5 bg-emerald-600 text-white rounded-2xl text-xs font-black shadow-xl hover:bg-emerald-700 transition-all inline-block"
-            >
-              الذهاب إلى لوحة التحكم الرئيسية
-            </Link>
-          </div>
+      {successMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl flex items-center gap-3 shadow-sm">
+          <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
+          <span className="text-sm font-bold">{successMsg}</span>
         </div>
       )}
 
-      {/* الخطوة الأولى: عرض الباقات الثلاثة المتدرجة */}
-      {step === "plans" && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
-          {plans.map((plan) => (
-            <div
-              key={plan.id}
-              className={`border-2 rounded-3xl p-6 flex flex-col justify-between transition-all hover:scale-[1.02] ${plan.color}`}
-            >
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="px-3 py-1 bg-indigo-100 text-indigo-800 text-[10px] font-black rounded-full">
-                    {plan.badge}
-                  </span>
+      <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
+        <h2 className="text-lg font-black text-slate-900 border-b border-slate-100 pb-4">
+          الطلبات الواردة ({subscriptions.length})
+        </h2>
+
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-16 space-y-4">
+            <Loader2 size={40} className="animate-spin text-purple-600" />
+            <p className="text-sm font-bold text-slate-500">جاري تحميل البيانات...</p>
+          </div>
+        ) : subscriptions.length === 0 ? (
+          <div className="text-center py-16 text-slate-500 font-bold border-2 border-dashed border-slate-200 rounded-3xl">
+            لا توجد طلبات اشتراك مُسجلة حتى الآن.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4">
+            {subscriptions.map((sub) => (
+              <div key={sub.id} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-purple-100 text-purple-700 rounded-2xl flex items-center justify-center shrink-0">
+                    <User size={22} />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-black text-slate-900 text-sm">{sub.teacherName}</h4>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                  <Phone size={12}/> {sub.teacherPhone}
+                    </p>
+                  </div>
                 </div>
 
-                <h3 className="text-base font-black text-slate-900">{plan.name}</h3>
-                <p className="text-xs text-slate-500 font-semibold">{plan.description}</p>
-
-                <div className="py-3 border-y border-slate-100 flex items-baseline gap-1">
-                  <span className="text-3xl font-black text-indigo-900">{plan.price}</span>
-                  <span className="text-xs text-slate-500 font-bold">ج.م / {plan.period}</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs bg-slate-50 p-3 rounded-xl md:bg-transparent md:p-0">
+                  <div>
+                    <span className="text-slate-400 block font-semibold">الباقة:</span>
+                    <span className="font-black text-purple-700">{sub.packageName}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-semibold">السعر:</span>
+                    <span className="font-black text-emerald-600">{sub.packagePrice}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block font-semibold">طريقة الدفع:</span>
+                    <span className="font-black text-indigo-700">{sub.paymentMethod}</span>
+                  </div>
                 </div>
 
-                <ul className="space-y-2.5 text-xs font-semibold text-slate-700 pt-2">
-                  {plan.features.map((feat, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <Check size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                      <span className="leading-relaxed">{feat}</span>
-                    </li>
-                  ))}
-                </ul>
+                <div className="flex items-center justify-between md:justify-end gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
+                  {sub.status === "pending" && <span className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-lg">قيد المراجعة</span>}
+                  {sub.status === "active" && <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg">مفعل (مفتوح)</span>}
+                  {sub.status === "rejected" && <span className="px-3 py-1 bg-rose-50 text-rose-700 text-xs font-bold rounded-lg">مرفوض (مغلق)</span>}
+
+                  <button
+                    onClick={() => setSelectedSub(sub)}
+                    className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md flex items-center gap-2 transition-all cursor-pointer"
+                  >
+                    <Eye size={16} /> التفاصيل والإيصال
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedSub && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-5 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={20} className="text-purple-400" />
+                <h3 className="font-black text-base">تفاصيل الاشتراك والتحويل</h3>
+              </div>
+              <button onClick={() => setSelectedSub(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-all cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
+                  <h4 className="text-xs font-black text-slate-400 uppercase flex items-center gap-2">
+                    <User size={14} /> بيانات المعلم
+                  </h4>
+                  <div className="space-y-2">
+                    <p className="text-sm font-black text-slate-800">{selectedSub.teacherName}</p>
+                    <p className="text-xs font-bold text-slate-600 flex items-center gap-2"><Phone size={12}/> {selectedSub.teacherPhone}</p>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 space-y-3">
+                  <h4 className="text-xs font-black text-purple-400 uppercase flex items-center gap-2">
+                    <Package size={14} /> تفاصيل الباقة
+                  </h4>
+                  <div className="space-y-2">
+                    <p className="text-sm font-black text-purple-900">{selectedSub.packageName}</p>
+                    <p className="text-sm font-black text-emerald-700 flex items-center gap-1"><DollarSign size={14}/> السعر: {selectedSub.packagePrice}</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="pt-6 mt-6 border-t border-slate-100">
+              <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 space-y-3">
+                <h4 className="text-xs font-black text-indigo-400 uppercase flex items-center gap-2">
+                  <CreditCard size={14} /> معلومات الدفع والتحويل
+                </h4>
+                <div className="flex flex-wrap gap-4 text-xs font-bold">
+                  <div className="bg-white px-3 py-2 rounded-lg border border-indigo-50">
+                    <span className="text-slate-500 block mb-1">الوسيلة المستخدمة:</span>
+                    <span className="text-indigo-700 text-sm">{selectedSub.paymentMethod}</span>
+                  </div>
+                  <div className="bg-white px-3 py-2 rounded-lg border border-indigo-50">
+                    <span className="text-slate-500 block mb-1">تاريخ الطلب:</span>
+                    <span className="text-slate-800">{selectedSub.date}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <span className="text-sm font-black text-slate-800 flex items-center gap-2">
+                  <FileText size={16} className="text-purple-600" /> صورة إيصال التحويل المرفقة:
+                </span>
+                <div className="w-full bg-slate-900 rounded-2xl overflow-hidden relative flex items-center justify-center p-2 min-h-[250px]">
+                  <img
+                    src={selectedSub.receiptImage}
+                    alt="إيصال التحويل"
+                    className="max-h-[400px] max-w-full object-contain rounded-xl"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 border-t border-slate-100 bg-slate-50 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
-                  onClick={() => handleProceedToCheckout(plan)}
-                  className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg transition-all"
+                  onClick={() => handleApprove(selectedSub)}
+                  className="flex-1 sm:flex-none px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-black rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
                 >
-                  اختر الباقة وانتقل للدفع
+                  <CheckCircle2 size={18} /> قبول وتفعيل (فتح المنصة)
+                </button>
+                <button
+                  onClick={() => handleReject(selectedSub.id)}
+                  className="flex-1 sm:flex-none px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white text-sm font-black rounded-xl shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <XCircle size={18} /> رفض (إغلاق المنصة)
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* الخطوة الثانية: الدفع عبر رقم ثابت (فودافون كاش أو انستاباي فقط) */}
-      {step === "checkout" && selectedPlan && (
-        <div className="bg-white border-2 border-indigo-100 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 max-w-3xl mx-auto">
-          <div className="flex items-center justify-between pb-4 border-b border-indigo-50">
-            <div>
-              <span className="text-xs font-bold text-indigo-600 block">إتمام الاشتراك الآمن</span>
-              <h2 className="text-xl font-black text-slate-900">اختر طريقة الدفع (فودافون كاش أو انستا باي)</h2>
-            </div>
-            <button
-              onClick={() => setStep("plans")}
-              className="text-xs font-bold text-slate-500 hover:text-slate-900 underline"
-            >
-              تغيير الباقة
-            </button>
-          </div>
-
-          {/* ملخص الباقة والمبلغ المطلوبة */}
-          <div className="p-4 bg-indigo-50/60 border border-indigo-100 rounded-2xl flex items-center justify-between text-xs font-bold">
-            <div>
-              <span className="text-slate-500 block">الباقة المختارة:</span>
-              <span className="text-indigo-950 text-sm font-black">{selectedPlan.name}</span>
-            </div>
-            <div className="text-left">
-              <span className="text-slate-500 block">المبلغ الإجمالي للاستحقاق:</span>
-              <span className="text-indigo-950 text-base font-black">{selectedPlan.price} ج.م</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleConfirmPayment} className="space-y-6">
-            <div className="space-y-4">
-              <label className="text-xs font-black text-slate-800 block">طرق الدفع الثابتة المتاحة:</label>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                
-                {/* فودافون كاش */}
-                <div
-                  onClick={() => setSelectedPaymentMethod("vodafone")}
-                  className={`cursor-pointer border-2 rounded-2xl p-5 transition-all flex flex-col justify-between ${
-                    selectedPaymentMethod === "vodafone"
-                      ? "border-indigo-600 bg-indigo-50/40 shadow-md"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="p-2.5 rounded-xl bg-rose-600 text-white">
-                        <Smartphone size={20} />
-                      </div>
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={selectedPaymentMethod === "vodafone"}
-                        onChange={() => setSelectedPaymentMethod("vodafone")}
-                        className="accent-indigo-600 w-4 h-4"
-                      />
-                    </div>
-                    <h4 className="text-xs font-black text-slate-900">فودافون كاش (Vodafone Cash)</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                      قم بالتحويل على رقم المنصة المخصص: <span className="text-rose-600 font-black block text-sm mt-1">01026377928</span>
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-                    اطلب #9* تحويل المبلغ للرقم أعلاه.
-                  </div>
-                </div>
-
-                {/* انستاباي */}
-                <div
-                  onClick={() => setSelectedPaymentMethod("instapay")}
-                  className={`cursor-pointer border-2 rounded-2xl p-5 transition-all flex flex-col justify-between ${
-                    selectedPaymentMethod === "instapay"
-                      ? "border-indigo-600 bg-indigo-50/40 shadow-md"
-                      : "border-slate-200 bg-white hover:border-slate-300"
-                  }`}
-                >
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="p-2.5 rounded-xl bg-purple-600 text-white">
-                        <CreditCard size={20} />
-                      </div>
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={selectedPaymentMethod === "instapay"}
-                        onChange={() => setSelectedPaymentMethod("instapay")}
-                        className="accent-indigo-600 w-4 h-4"
-                      />
-                    </div>
-                    <h4 className="text-xs font-black text-slate-900">انستا باي (InstaPay)</h4>
-                    <p className="text-xs text-slate-600 leading-relaxed font-semibold">
-                      قم بالتحويل على الحساب أو رقم الهاتف الموحد للمنصة: <span className="text-purple-600 font-black block text-sm mt-1">01026377928</span>
-                    </p>
-                  </div>
-                  <div className="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500">
-                    حول للمحفظة أو العنوان المذكور مباشرة.
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* رفع صورة الإيصال */}
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">رفع صورة إيصال التحويل (مطلوب للتأكيد):</label>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                required
-                className="w-full text-xs text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 border border-slate-200 rounded-2xl p-2 bg-slate-50 cursor-pointer"
-              />
-              <p className="text-[10px] text-slate-400">أرفق سكرين شوت لعملية التحويل الناجحة ليقوم الأدمن بالمراجعة والفتح الفوري.</p>
-            </div>
-
-            <div className="pt-4 flex items-center justify-end gap-3">
               <button
-                type="button"
-                onClick={() => setStep("plans")}
-                className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-xs font-bold transition-all"
+                onClick={() => handleDelete(selectedSub.id)}
+                className="w-full sm:w-auto px-4 py-3 bg-rose-100 hover:bg-rose-200 text-rose-700 text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
-                رجوع للباقات
-              </button>
-              <button
-                type="submit"
-                className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-black shadow-lg transition-all"
-              >
-                تأكيد الدفع وإرسال الطلب للأدمن
+                <Trash2 size={16} /> حذف السجل
               </button>
             </div>
-          </form>
+          </div>
         </div>
       )}
-
     </div>
   );
 }
