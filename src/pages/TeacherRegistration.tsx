@@ -37,7 +37,7 @@ export default function TeacherVerification() {
       if (error) throw error;
 
       if (data) {
-        // تحويل البيانات لتناسب هيكل العرض في صفحة الإدارة
+        // تحويل البيانات لتناسب هيكل العرض في صفحة الإدارة وربطها بالبيانات القادمة من ملف Profile
         const formattedTeachers = data.map((t: any) => ({
           id: t.user_id,
           name: t.name || "مدرس بدون اسم",
@@ -47,7 +47,7 @@ export default function TeacherVerification() {
           date: t.updated_at ? t.updated_at.split('T')[0] : "حديث",
           idCardFront: t.id_front_url || "",
           idCardBack: t.id_back_url || "",
-          status: t.status || "pending" // تأكد من إضافة حقل status في الجدول إذا رغبت، أو افتراضي pending
+          status: t.status || "pending" // حالة التوثيق: pending, approved, rejected
         }));
         setTeachers(formattedTeachers);
       }
@@ -60,7 +60,7 @@ export default function TeacherVerification() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      // تحديث الحالة في قاعدة البيانات
+      // تحديث الحالة في قاعدة البيانات جدول teachers_profile
       const { error } = await supabase
         .from('teachers_profile')
         .update({ status: newStatus })
@@ -115,7 +115,7 @@ export default function TeacherVerification() {
   }
 
   return (
-    <div className=" space-y-8 min-h-screen" dir="rtl">
+    <div className="space-y-8 min-h-screen" dir="rtl">
       
       {/* رأس الصفحة الاحترافي */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-200/85 shadow-sm relative overflow-hidden">
@@ -134,7 +134,7 @@ export default function TeacherVerification() {
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم الشخصية.
+              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم الشخصية ومنحهم الموافقات.
             </p>
           </div>
         </div>
@@ -206,7 +206,7 @@ export default function TeacherVerification() {
                     </div>
                   </div>
 
-                  {/* الحالة */}
+                  {/* حالة الطلب */}
                   <div>
                     {teacher.status === 'pending' && (
                       <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200/60 text-[10px] font-bold inline-flex items-center gap-1">
@@ -270,7 +270,7 @@ export default function TeacherVerification() {
         )}
       </div>
 
-      {/* كارت التفاصيل الكاملة */}
+      {/* مودال التفاصيل الكاملة وصور البطاقة وإعطاء الموافقة */}
       {selectedTeacher && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[32px] max-w-2xl w-full p-8 relative shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -303,7 +303,7 @@ export default function TeacherVerification() {
               </div>
             </div>
 
-            {/* معاينة صور البطاقة */}
+            {/* معاينة صور البطاقة (الوجه والظهر) المرفوعة من صفحة Profile */}
             <div className="mb-6">
               <span className="text-xs font-bold text-slate-700 block mb-3 flex items-center gap-1.5">
                 <FileText size={16} className="text-purple-600" />
@@ -349,7 +349,7 @@ export default function TeacherVerification() {
               </div>
             </div>
 
-            {/* أزرار القرار */}
+            {/* أزرار القرار وإعطاء الموافقة أو الرفض */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
               <span className="text-xs font-bold text-slate-500 block">اتخاذ القرار النهائي للتوثيق:</span>
               <div className="grid grid-cols-2 gap-3">
@@ -374,7 +374,7 @@ export default function TeacherVerification() {
         </div>
       )}
 
-      {/* نافذة تكبير الصورة */}
+      {/* نافذة تكبير الصورة (Lightbox) */}
       {zoomedImage && (
         <div 
           className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 md:p-10"
