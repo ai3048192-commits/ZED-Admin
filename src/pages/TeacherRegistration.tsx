@@ -42,11 +42,38 @@ export default function TeacherVerification() {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: string) => {
-    // التحديث محلياً مباشرة (approved ستظهر كـ "موافق" و rejected كـ "مرفوض")
-    setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
-    if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
-      setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
+  // تم تحديث الدالة لتحديث قاعدة البيانات والانتقال الفوري لحالة المعلم
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      // 1. التحديث في قاعدة البيانات عبر Supabase
+      const { error } = await supabase
+        .from('teachers_profile')
+        .update({ status: newStatus })
+        .eq('user_id', id);
+
+      if (error) {
+        // تجربة التحديث باستخدام حقل id العادي إذا لم يوجد user_id
+        const { error: idError } = await supabase
+          .from('teachers_profile')
+          .update({ status: newStatus })
+          .eq('id', id);
+        
+        if (idError) throw idError;
+      }
+
+      // 2. التحديث محلياً في الواجهة فوراً
+      setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
+      
+      // 3. تحديث المعلم المحدد وإغلاق المودال أو الانتقال لصفحته
+      if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
+        setSelectedTeacher({ ...selectedTeacher, status: newStatus });
+      }
+
+      // إغلاق المودال الحالي (أو الانتقال لصفحة تفاصيله المحدثة)
+      setSelectedTeacher(null);
+      
+    } catch (err: any) {
+      alert("حدث خطأ أثناء تحديث الحالة: " + err.message);
     }
   };
 
@@ -149,7 +176,7 @@ export default function TeacherVerification() {
         </button>
       </div>
 
-      {/* شبكة الكروت مع إمكانية التمرير (Scroll) */}
+      {/* شبكة الكروت مع التمريير (Scroll) */}
       <div className="max-h-[70vh] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => {
