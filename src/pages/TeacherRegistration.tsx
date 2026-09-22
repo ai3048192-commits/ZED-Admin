@@ -37,17 +37,16 @@ export default function TeacherVerification() {
       if (error) throw error;
 
       if (data) {
-        // تحويل البيانات لتناسب هيكل العرض في صفحة الإدارة وربطها بالبيانات القادمة من ملف Profile
         const formattedTeachers = data.map((t: any) => ({
           id: t.user_id,
           name: t.name || "مدرس بدون اسم",
-          email: t.email || "test@teacher.com",
+          email: t.email || "غير متوفر",
           phone: t.phone || "غير متوفر",
           subject: t.role || "مدرس خبير",
           date: t.updated_at ? t.updated_at.split('T')[0] : "حديث",
           idCardFront: t.id_front_url || "",
           idCardBack: t.id_back_url || "",
-          status: t.status || "pending" // حالة التوثيق: pending, approved, rejected
+          status: t.status || "pending"
         }));
         setTeachers(formattedTeachers);
       }
@@ -60,7 +59,6 @@ export default function TeacherVerification() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      // تحديث الحالة في قاعدة البيانات جدول teachers_profile
       const { error } = await supabase
         .from('teachers_profile')
         .update({ status: newStatus })
@@ -68,10 +66,11 @@ export default function TeacherVerification() {
 
       if (error) throw error;
 
-      setTeachers(teachers.map(t => t.id === id ? { ...t, status: newStatus } : t));
-      if (selectedTeacher && selectedTeacher.id === id) {
-        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
-      }
+      setTeachers(prevTeachers => 
+        prevTeachers.map(t => t.id === id ? { ...t, status: newStatus } : t)
+      );
+
+      setSelectedTeacher((prev: any) => prev && prev.id === id ? { ...prev, status: newStatus } : prev);
     } catch (err: any) {
       alert("خطأ أثناء تحديث الحالة: " + err.message);
     }
@@ -87,7 +86,7 @@ export default function TeacherVerification() {
 
       if (error) throw error;
 
-      setTeachers(teachers.filter(t => t.id !== id));
+      setTeachers(prevTeachers => prevTeachers.filter(t => t.id !== id));
       if (selectedTeacher && selectedTeacher.id === id) {
         setSelectedTeacher(null);
       }
@@ -117,7 +116,7 @@ export default function TeacherVerification() {
   return (
     <div className="space-y-8 min-h-screen" dir="rtl">
       
-      {/* رأس الصفحة الاحترافي */}
+      {/* رأس الصفحة */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-200/85 shadow-sm relative overflow-hidden">
         <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
         
@@ -134,12 +133,11 @@ export default function TeacherVerification() {
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم الشخصية ومنحهم الموافقات.
+              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم ومنحهم الموافقات.
             </p>
           </div>
         </div>
 
-        {/* شريط البحث */}
         <div className="relative w-full md:w-80 z-10">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
@@ -152,7 +150,7 @@ export default function TeacherVerification() {
         </div>
       </div>
 
-      {/* تبويبات الفلترة السريعة */}
+      {/* التبويبات */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
         <button 
           onClick={() => setActiveTab("all")}
@@ -180,7 +178,7 @@ export default function TeacherVerification() {
         </button>
       </div>
 
-      {/* شبكة الكروت (Grid) */}
+      {/* شبكة الكروت */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => (
@@ -206,7 +204,6 @@ export default function TeacherVerification() {
                     </div>
                   </div>
 
-                  {/* حالة الطلب */}
                   <div>
                     {teacher.status === 'pending' && (
                       <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200/60 text-[10px] font-bold inline-flex items-center gap-1">
@@ -270,7 +267,7 @@ export default function TeacherVerification() {
         )}
       </div>
 
-      {/* مودال التفاصيل الكاملة وصور البطاقة وإعطاء الموافقة */}
+      {/* مودال التفاصيل الكاملة */}
       {selectedTeacher && (
         <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-[32px] max-w-2xl w-full p-8 relative shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -303,7 +300,7 @@ export default function TeacherVerification() {
               </div>
             </div>
 
-            {/* معاينة صور البطاقة (الوجه والظهر) المرفوعة من صفحة Profile */}
+            {/* صور البطاقة */}
             <div className="mb-6">
               <span className="text-xs font-bold text-slate-700 block mb-3 flex items-center gap-1.5">
                 <FileText size={16} className="text-purple-600" />
@@ -349,7 +346,7 @@ export default function TeacherVerification() {
               </div>
             </div>
 
-            {/* أزرار القرار وإعطاء الموافقة أو الرفض */}
+            {/* أزرار اتخاذ القرار */}
             <div className="space-y-3 pt-4 border-t border-slate-100">
               <span className="text-xs font-bold text-slate-500 block">اتخاذ القرار النهائي للتوثيق:</span>
               <div className="grid grid-cols-2 gap-3">
@@ -374,7 +371,7 @@ export default function TeacherVerification() {
         </div>
       )}
 
-      {/* نافذة تكبير الصورة (Lightbox) */}
+      {/* نافذة تكبير الصورة */}
       {zoomedImage && (
         <div 
           className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 md:p-10"
