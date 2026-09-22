@@ -43,24 +43,11 @@ export default function TeacherVerification() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    try {
-      // محاولة التحديث في قاعدة البيانات إذا كان عمود status موجوداً
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: newStatus })
-        .eq('id', id);
-
-      if (error) {
-        console.warn("عمود status غير موجود في جدول profiles، يتم التحديث محلياً فقط.");
-      }
-
-      setTeachers(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
-      if (selectedTeacher && selectedTeacher.id === id) {
-        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
-      }
-    } catch (err: any) {
-      alert("خطأ أثناء تحديث الحالة: " + err.message);
+  const handleStatusChange = (id: string, newStatus: string) => {
+    // التحديث محلياً مباشرة بدون إرسال طلب غير موجود لقاعدة البيانات لتجنب خطأ 400
+    setTeachers(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    if (selectedTeacher && selectedTeacher.id === id) {
+      setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
     }
   };
 
@@ -87,7 +74,6 @@ export default function TeacherVerification() {
     return matchesSearch;
   });
 
-  // دوال مساعدة لجلب روابط الصور بأكثر من اسم محتمل للأعمدة
   const getFrontImage = (teacher: any) => {
     return teacher.id_front_url || teacher.front_image || teacher.national_id_front || teacher.id_image || null;
   };
@@ -164,7 +150,7 @@ export default function TeacherVerification() {
         </button>
       </div>
 
-      {/* شبكة الكروت بأحجام متناسقة ومضبوطة */}
+      {/* شبكة الكروت */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => {
@@ -324,7 +310,7 @@ export default function TeacherVerification() {
         </div>
       )}
 
-      {/* نافذة تكبير الصورة (Lightbox) */}
+      {/* نافذة تكبير الصورة */}
       {zoomedImage && (
         <div 
           className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4"
