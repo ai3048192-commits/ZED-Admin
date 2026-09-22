@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Maximize2,
   Loader2,
-  PlusCircle
+  PlusCircle,
+  Database
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -23,40 +24,36 @@ export default function TeacherVerification() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
-  const [dbError, setDbError] = useState<string | null>(null);
+  const [tableNameUsed, setTableNameUsed] = useState("teachers_profile");
 
   useEffect(() => {
-    fetchTeachersData();
+    fetchTeachersData("teachers_profile");
   }, []);
 
-  const fetchTeachersData = async () => {
+  const fetchTeachersData = async (tableName: string) => {
     try {
       setLoading(true);
-      setDbError(null);
+      setTableNameUsed(tableName);
 
-      // استعلام من جدول teachers_profile
       const { data, error } = await supabase
-        .from('teachers_profile')
+        .from(tableName)
         .select('*');
 
-      console.log("Supabase Response - Data:", data);
-      console.log("Supabase Response - Error:", error);
+      console.log(`Response from [${tableName}] - Data:`, data);
+      console.log(`Response from [${tableName}] - Error:`, error);
 
-      if (error) {
-        setDbError(error.message);
-        throw error;
-      }
+      if (error) throw error;
 
       if (data && data.length > 0) {
         const formattedTeachers = data.map((t: any) => ({
           id: t.user_id || t.id,
-          name: t.name || t.full_name || "مدرس بدون اسم",
+          name: t.name || t.full_name || t.username || "مدرس بدون اسم",
           email: t.email || "غير متوفر",
-          phone: t.phone || "غير متوفر",
+          phone: t.phone || t.mobile || "غير متوفر",
           subject: t.role || t.subject || "مدرس خبير",
           date: t.updated_at ? t.updated_at.split('T')[0] : "حديث",
-          idCardFront: t.id_front_url || t.idCardFront || "",
-          idCardBack: t.id_back_url || t.idCardBack || "",
+          idCardFront: t.id_front_url || t.idCardFront || t.front_image || "",
+          idCardBack: t.id_back_url || t.idCardBack || t.back_image || "",
           status: t.status || "pending"
         }));
         setTeachers(formattedTeachers);
@@ -64,27 +61,10 @@ export default function TeacherVerification() {
         setTeachers([]);
       }
     } catch (err: any) {
-      console.error("خطأ في جلب بيانات المعلمين:", err);
+      console.error("خطأ في جلب البيانات:", err.message);
     } finally {
       setLoading(false);
     }
-  };
-
-  // دالة لإضافة بيانات تجريبية مؤقتة للتأكد من عمل الواجهة
-  const addMockData = () => {
-    const mockTeacher = {
-      id: "mock-1",
-      name: "أحمد محمد (تجريبي)",
-      email: "ahmed@teacher.com",
-      phone: "01012345678",
-      subject: "مدرس رياضيات",
-      date: "2026-06-06",
-      idCardFront: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
-      idCardBack: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
-      status: "pending"
-    };
-    setTeachers([mockTeacher]);
-    setSelectedTeacher(mockTeacher);
   };
 
   const handleStatusChange = async (id: string, newStatus: string) => {
@@ -96,11 +76,14 @@ export default function TeacherVerification() {
 
     try {
       const { error } = await supabase
-        .from('teachers_profile')
+        .from(tableNameUsed)
         .update({ status: newStatus })
         .eq('user_id', id);
 
-      if (error) throw error;
+      if (error) {
+        // محاولة التحديث باستخدام العمود id بدلاً من user_id
+        await supabase.from(tableNameUsed).update({ status: newStatus }).eq('id', id);
+      }
 
       setTeachers(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
       if (selectedTeacher && selectedTeacher.id === id) {
@@ -120,13 +103,7 @@ export default function TeacherVerification() {
     }
 
     try {
-      const { error } = await supabase
-        .from('teachers_profile')
-        .delete()
-        .eq('user_id', id);
-
-      if (error) throw error;
-
+      await supabase.from(tableNameUsed).delete().eq('user_id', id);
       setTeachers(prev => prev.filter(t => t.id !== id));
       if (selectedTeacher && selectedTeacher.id === id) setSelectedTeacher(null);
     } catch (err: any) {
@@ -172,21 +149,21 @@ export default function TeacherVerification() {
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-              استعرض بيانات المعلمين القادمة من قاعدة البيانات وراجع هوياتهم ومنحهم الموافقات.
+              الجدول الحالي المرتبط: <span className="font-bold text-purple-600">{tableNameUsed}</span>
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 z-10">
+        <div className="flex items-center gap-3 z-10 flex-wrap">
           <button 
-            onClick={addMockData}
-            className="px-4 py-3 bg-purple-50 text-purple-600 hover:bg-purple-100 font-bold text-xs rounded-2xl transition-all flex items-center gap-1.5 border border-purple-200"
+            onClick={() => fetchTeachersData(tableNameUsed === 'teachers_profile' ? 'profiles' : 'teachers_profile')}
+            className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-2xl transition-all flex items-center gap-1.5 border border-slate-200"
           >
-            <PlusCircle size={16} />
-            <span>تجربة بيانات وهمية</span>
+            <Database size={16} />
+            <span>تبديل جدول البحث</span>
           </button>
-          
-          <div className="relative w-full md:w-64">
+
+          <div className="relative w-full md:w-56">
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text" 
@@ -198,13 +175,6 @@ export default function TeacherVerification() {
           </div>
         </div>
       </div>
-
-      {dbError && (
-        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-bold flex items-center gap-2">
-          <AlertCircle size={18} />
-          <span>خطأ في قاعدة البيانات من Supabase: {dbError} (تحقق من الـ Console لمزيد من التفاصيل).</span>
-        </div>
-      )}
 
       {/* التبويبات */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -318,14 +288,8 @@ export default function TeacherVerification() {
         ) : (
           <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
             <AlertCircle className="w-12 h-12 text-slate-300 mx-auto" />
-            <p className="text-slate-500 font-bold text-sm">لا توجد طلبات معلمين مسجلة في قاعدة البيانات حتى الآن.</p>
-            <button 
-              onClick={addMockData}
-              className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-purple-700 transition-all inline-flex items-center gap-1.5"
-            >
-              <PlusCircle size={14} />
-              <span>إضافة بطاقة تجريبية للعرض</span>
-            </button>
+            <p className="text-slate-500 font-bold text-sm">الجدول ({tableNameUsed}) لا يحتوي على بيانات مسجلة حالياً.</p>
+            <p className="text-xs text-slate-400">قم بتجربة زر "تبديل جدول البحث" أعلى الصفحة أو تأكد من تسجيل معلم جديد في التطبيق.</p>
           </div>
         )}
       </div>
