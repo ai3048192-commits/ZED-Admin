@@ -16,9 +16,13 @@ export default function TeacherVerification() {
   const fetchTeachersData = async () => {
     try {
       setLoading(true);
+      // استخدام جدول profiles الصحيح الظاهر في قاعدة البيانات لديك
       const { data, error } = await supabase
-        .from('teachers_profile')
+        .from('profiles')
         .select('*');
+
+      console.log("Supabase Data:", data);
+      console.log("Supabase Error:", error);
 
       if (error) throw error;
 
@@ -35,7 +39,7 @@ export default function TeacherVerification() {
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       const { error } = await supabase
-        .from('teachers_profile')
+        .from('profiles')
         .update({ status: newStatus })
         .eq('id', id);
 
@@ -53,7 +57,7 @@ export default function TeacherVerification() {
   const handleDelete = async (id: string) => {
     if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
     try {
-      await supabase.from('teachers_profile').delete().eq('id', id);
+      await supabase.from('profiles').delete().eq('id', id);
       setTeachers(prev => prev.filter(t => t.id !== id));
       setSelectedTeacher(null);
     } catch (err: any) {
@@ -62,7 +66,7 @@ export default function TeacherVerification() {
   };
 
   const filteredTeachers = teachers.filter(t => {
-    const name = t.name || t.full_name || "";
+    const name = t.full_name || t.name || "";
     const email = t.email || "";
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           email.toLowerCase().includes(searchTerm.toLowerCase());
@@ -88,7 +92,7 @@ export default function TeacherVerification() {
       <div className="flex items-center justify-between bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
         <div>
           <h1 className="text-2xl font-black text-slate-900">توثيق حسابات المعلمين</h1>
-          <p className="text-sm text-slate-500 mt-1">استعرض بيانات المعلمين ومراجعة هوياتهم</p>
+          <p className="text-sm text-slate-500 mt-1">البيانات مسحوبة مباشرة من جدول profiles</p>
         </div>
         <div>
           <input 
@@ -136,7 +140,7 @@ export default function TeacherVerification() {
             <div key={teacher.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-bold text-slate-900 text-sm">{teacher.name || teacher.full_name || "بدون اسم"}</h3>
+                  <h3 className="font-bold text-slate-900 text-sm">{teacher.full_name || teacher.name || "بدون اسم"}</h3>
                   <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
                     teacher.status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
                     teacher.status === 'rejected' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600'
@@ -166,7 +170,7 @@ export default function TeacherVerification() {
           ))
         ) : (
           <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200 text-slate-500 text-sm">
-            لا توجد بيانات مسجلة في جدول `teachers_profile` حالياً.
+            لا توجد بيانات في جدول profiles أو أن سياسات الحماية (RLS) تمنع جلبها. تأكد من إيقاف RLS في لوحة Supabase.
           </div>
         )}
       </div>
@@ -177,7 +181,7 @@ export default function TeacherVerification() {
           <div className="bg-white rounded-3xl max-w-lg w-full p-6 relative shadow-xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-bold text-slate-900 mb-4">تفاصيل المعلم</h2>
             <div className="space-y-3 text-xs text-slate-700 mb-6">
-              <p><strong>الاسم:</strong> {selectedTeacher.name || selectedTeacher.full_name}</p>
+              <p><strong>الاسم:</strong> {selectedTeacher.full_name || selectedTeacher.name}</p>
               <p><strong>البريد:</strong> {selectedTeacher.email}</p>
               <p><strong>الهاتف:</strong> {selectedTeacher.phone}</p>
               
