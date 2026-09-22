@@ -13,6 +13,10 @@ import {
   UserCheck,
   X,
   XCircle,
+  LogIn,
+  LogOut,
+  Lock,
+  Mail,
 } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 
@@ -73,6 +77,12 @@ export default function TeacherVerification() {
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  // نموذج الدخول اللي جوه الصفحة نفسها
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState("");
+
   const fetchTeachersData = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -108,7 +118,30 @@ export default function TeacherVerification() {
 
   useEffect(() => {
     void fetchTeachersData();
+    // لو الجلسة اتغيّرت (دخول/خروج)، نعيد الفحص من غير reload
+    const { data: sub } = supabase.auth.onAuthStateChange(() => void fetchTeachersData());
+    return () => sub.subscription.unsubscribe();
   }, [fetchTeachersData]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignInError("");
+    setSigningIn(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+    setSigningIn(false);
+    if (error) {
+      setSignInError("البريد أو كلمة المرور غير صحيحة.");
+      return;
+    }
+    setPassword("");
+    // onAuthStateChange هيعيد الفحص تلقائياً
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setTeachers([]);
+    setAccess("guest");
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -177,19 +210,84 @@ export default function TeacherVerification() {
     );
   }
 
-  if (access === "guest" || access === "not-admin") {
+  // مش مسجّل دخول → خانة دخول جوه الصفحة نفسها.
+  // تكتب مرة واحدة، وبعدها المتصفح بيفتكر الجلسة وتفتح على طول كل مرة.
+  if (access === "guest") {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
+        <div className="w-full max-w-sm space-y-5 rounded-[32px] border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="space-y-2 text-center">
+            <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-purple-50 text-purple-600">
+              <ShieldAlert size={28} />
+            </div>
+            <h1 className="text-lg font-black text-slate-900">دخول لوحة الإدارة</h1>
+            <p className="text-xs text-slate-500">هذه الصفحة مخصصة للإدارة. سجّل الدخول بحساب الأدمن.</p>
+          </div>
+
+          {signInError && (
+            <p role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-3 text-center text-xs font-bold text-rose-700">
+              {signInError}
+            </p>
+          )}
+
+          <form onSubmit={handleSignIn} className="space-y-3">
+            <div className="relative">
+              <Mail size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="email"
+                required
+                dir="ltr"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-right text-sm font-semibold text-slate-800 focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/15"
+              />
+            </div>
+            <div className="relative">
+              <Lock size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="كلمة المرور"
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-10 text-sm font-semibold text-slate-800 focus:border-purple-600 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-600/15"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={signingIn}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 py-3 text-sm font-black text-white shadow-md transition-colors hover:bg-purple-700 disabled:opacity-60"
+            >
+              {signingIn ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+              دخول
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // مسجّل دخول بس مش أدمن
+  if (access === "not-admin") {
     return (
       <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
         <div className="max-w-md space-y-3 rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-sm">
           <ShieldAlert size={36} className="mx-auto text-rose-500" />
-          <h1 className="text-lg font-black text-slate-900">
-            {access === "guest" ? "يجب تسجيل الدخول بحساب الإدارة" : "هذه الصفحة مخصصة للإدارة فقط"}
-          </h1>
+          <h1 className="text-lg font-black text-slate-900">هذا الحساب ليس حساب إدارة</h1>
           <p className="text-xs leading-relaxed text-slate-500">
-            {access === "guest"
-              ? "سجّل الدخول بحساب الأدمن لعرض طلبات توثيق المعلمين."
-              : "حسابك الحالي ليس حساب أدمن. يتم تفعيل حسابات الإدارة من قاعدة البيانات فقط."}
+            الحساب الحالي مش أدمن. سجّل الخروج وادخل بحساب الإدارة الصحيح.
           </p>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-5 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-200"
+          >
+            <LogOut size={15} />
+            تسجيل الخروج
+          </button>
         </div>
       </div>
     );
@@ -216,6 +314,15 @@ export default function TeacherVerification() {
               راجع بيانات المعلمين وصور هوياتهم الشخصية، ووثّق الحسابات أو ارفضها.
             </p>
           </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            title="تسجيل الخروج"
+            className="absolute left-6 top-6 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-rose-50 hover:text-rose-600"
+          >
+            <LogOut size={14} />
+            خروج
+          </button>
         </div>
 
         <div className="relative z-10 w-full md:w-80">
