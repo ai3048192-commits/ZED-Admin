@@ -35,7 +35,6 @@ const menuItems: MenuItem[] = [
     name: "توثيق حسابات المعلمين", 
     icon: UserCheck, 
     path: "/admin-teacher-verification",
-    badge: "جديد"
   },
   { name: "من نحن", icon: Info, path: "/admin-about" },
   {
