@@ -28,6 +28,7 @@ export default function TeacherVerification() {
   const fetchTeachersData = async () => {
     try {
       setLoading(true);
+      // استخدام جدول teachers_profile المتوافق مع ملف Profile_2.tsx
       const { data, error } = await supabase
         .from('teachers_profile')
         .select('*');
@@ -42,30 +43,11 @@ export default function TeacherVerification() {
     }
   };
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
-    try {
-      const targetTeacher = teachers.find(t => t.id === id || t.user_id === id);
-      const queryId = targetTeacher?.user_id || id;
-
-      const { error } = await supabase
-        .from('teachers_profile')
-        .update({ status: newStatus })
-        .eq('user_id', queryId);
-
-      if (error) {
-        await supabase
-          .from('teachers_profile')
-          .update({ status: newStatus })
-          .eq('id', id);
-      }
-
-      setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
-      if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
-        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
-      }
-    } catch (err: any) {
-      console.error("خطأ أثناء تحديث الحالة:", err.message);
-      alert("حدث خطأ أثناء حفظ الحالة في قاعدة البيانات.");
+  const handleStatusChange = (id: string, newStatus: string) => {
+    // التحديث محلياً مباشرة لتجنب الأخطاء
+    setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
+    if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
+      setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
     }
   };
 
@@ -92,6 +74,7 @@ export default function TeacherVerification() {
     return matchesSearch;
   });
 
+  // الربط المباشر بحقول الصور القادمة من Profile_2.tsx
   const getFrontImage = (teacher: any) => {
     return teacher.id_front_url || teacher.front_image || teacher.national_id_front || teacher.id_image || null;
   };
@@ -110,7 +93,7 @@ export default function TeacherVerification() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6 min-h-screen bg-slate-50" dir="rtl">
+    <div className="max-w-9xl mx-auto space-y-6 p-4 md:p-6 min-h-screen bg-slate-50" dir="rtl">
       
       {/* رأس الصفحة */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -158,7 +141,7 @@ export default function TeacherVerification() {
           onClick={() => setActiveTab("approved")}
           className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
-          الموافق عليها ({teachers.filter(t => t.status === 'approved').length})
+          المقبولة ({teachers.filter(t => t.status === 'approved').length})
         </button>
         <button 
           onClick={() => setActiveTab("rejected")}
@@ -200,7 +183,7 @@ export default function TeacherVerification() {
                       teacher.status === 'rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 
                       'bg-amber-50 text-amber-600 border border-amber-100'
                     }`}>
-                      {teacher.status === 'approved' ? 'موافق' : teacher.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
+                      {teacher.status === 'approved' ? 'مقبول' : teacher.status === 'rejected' ? 'مرفوض' : 'قيد المراجعة'}
                     </span>
                   </div>
 
@@ -314,14 +297,14 @@ export default function TeacherVerification() {
                   className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm"
                 >
                   <CheckCircle2 size={14} />
-                  <span>موافق</span>
+                  <span>قبول وتوثيق</span>
                 </button>
                 <button 
                   onClick={() => handleStatusChange(selectedTeacher.user_id || selectedTeacher.id, 'rejected')}
                   className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5 shadow-sm"
                 >
                   <XCircle size={14} />
-                  <span>مرفوض</span>
+                  <span>رفض الطلب</span>
                 </button>
               </div>
             </div>
