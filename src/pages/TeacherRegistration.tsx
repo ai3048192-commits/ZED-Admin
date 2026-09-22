@@ -11,7 +11,8 @@ import {
   Sparkles,
   AlertCircle,
   Maximize2,
-  Loader2
+  Loader2,
+  PlusCircle
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -22,6 +23,7 @@ export default function TeacherVerification() {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [dbError, setDbError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTeachersData();
@@ -30,34 +32,68 @@ export default function TeacherVerification() {
   const fetchTeachersData = async () => {
     try {
       setLoading(true);
+      setDbError(null);
+
+      // استعلام من جدول teachers_profile
       const { data, error } = await supabase
         .from('teachers_profile')
         .select('*');
 
-      if (error) throw error;
+      console.log("Supabase Response - Data:", data);
+      console.log("Supabase Response - Error:", error);
 
-      if (data) {
+      if (error) {
+        setDbError(error.message);
+        throw error;
+      }
+
+      if (data && data.length > 0) {
         const formattedTeachers = data.map((t: any) => ({
-          id: t.user_id,
-          name: t.name || "مدرس بدون اسم",
+          id: t.user_id || t.id,
+          name: t.name || t.full_name || "مدرس بدون اسم",
           email: t.email || "غير متوفر",
           phone: t.phone || "غير متوفر",
-          subject: t.role || "مدرس خبير",
+          subject: t.role || t.subject || "مدرس خبير",
           date: t.updated_at ? t.updated_at.split('T')[0] : "حديث",
-          idCardFront: t.id_front_url || "",
-          idCardBack: t.id_back_url || "",
+          idCardFront: t.id_front_url || t.idCardFront || "",
+          idCardBack: t.id_back_url || t.idCardBack || "",
           status: t.status || "pending"
         }));
         setTeachers(formattedTeachers);
+      } else {
+        setTeachers([]);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("خطأ في جلب بيانات المعلمين:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  // دالة لإضافة بيانات تجريبية مؤقتة للتأكد من عمل الواجهة
+  const addMockData = () => {
+    const mockTeacher = {
+      id: "mock-1",
+      name: "أحمد محمد (تجريبي)",
+      email: "ahmed@teacher.com",
+      phone: "01012345678",
+      subject: "مدرس رياضيات",
+      date: "2026-06-06",
+      idCardFront: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
+      idCardBack: "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500",
+      status: "pending"
+    };
+    setTeachers([mockTeacher]);
+    setSelectedTeacher(mockTeacher);
+  };
+
   const handleStatusChange = async (id: string, newStatus: string) => {
+    if (id.startsWith("mock-")) {
+      setTeachers(teachers.map(t => t.id === id ? { ...t, status: newStatus } : t));
+      if (selectedTeacher) setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('teachers_profile')
@@ -66,18 +102,23 @@ export default function TeacherVerification() {
 
       if (error) throw error;
 
-      setTeachers(prevTeachers => 
-        prevTeachers.map(t => t.id === id ? { ...t, status: newStatus } : t)
-      );
-
-      setSelectedTeacher((prev: any) => prev && prev.id === id ? { ...prev, status: newStatus } : prev);
+      setTeachers(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+      if (selectedTeacher && selectedTeacher.id === id) {
+        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
+      }
     } catch (err: any) {
       alert("خطأ أثناء تحديث الحالة: " + err.message);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) return;
+    if (!confirm("هل أنت متأكد من حذف هذا السجل؟")) return;
+    if (id.startsWith("mock-")) {
+      setTeachers(teachers.filter(t => t.id !== id));
+      setSelectedTeacher(null);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('teachers_profile')
@@ -86,10 +127,8 @@ export default function TeacherVerification() {
 
       if (error) throw error;
 
-      setTeachers(prevTeachers => prevTeachers.filter(t => t.id !== id));
-      if (selectedTeacher && selectedTeacher.id === id) {
-        setSelectedTeacher(null);
-      }
+      setTeachers(prev => prev.filter(t => t.id !== id));
+      if (selectedTeacher && selectedTeacher.id === id) setSelectedTeacher(null);
     } catch (err: any) {
       alert("خطأ أثناء الحذف: " + err.message);
     }
@@ -133,22 +172,39 @@ export default function TeacherVerification() {
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم ومنحهم الموافقات.
+              استعرض بيانات المعلمين القادمة من قاعدة البيانات وراجع هوياتهم ومنحهم الموافقات.
             </p>
           </div>
         </div>
 
-        <div className="relative w-full md:w-80 z-10">
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="بحث بالاسم، البريد، أو المادة..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-inner"
-          />
+        <div className="flex items-center gap-3 z-10">
+          <button 
+            onClick={addMockData}
+            className="px-4 py-3 bg-purple-50 text-purple-600 hover:bg-purple-100 font-bold text-xs rounded-2xl transition-all flex items-center gap-1.5 border border-purple-200"
+          >
+            <PlusCircle size={16} />
+            <span>تجربة بيانات وهمية</span>
+          </button>
+          
+          <div className="relative w-full md:w-64">
+            <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="بحث..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-inner"
+            />
+          </div>
         </div>
       </div>
+
+      {dbError && (
+        <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-bold flex items-center gap-2">
+          <AlertCircle size={18} />
+          <span>خطأ في قاعدة البيانات من Supabase: {dbError} (تحقق من الـ Console لمزيد من التفاصيل).</span>
+        </div>
+      )}
 
       {/* التبويبات */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
@@ -260,9 +316,16 @@ export default function TeacherVerification() {
             </div>
           ))
         ) : (
-          <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-slate-200">
-            <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+            <AlertCircle className="w-12 h-12 text-slate-300 mx-auto" />
             <p className="text-slate-500 font-bold text-sm">لا توجد طلبات معلمين مسجلة في قاعدة البيانات حتى الآن.</p>
+            <button 
+              onClick={addMockData}
+              className="px-4 py-2 bg-purple-600 text-white rounded-xl text-xs font-bold shadow-md hover:bg-purple-700 transition-all inline-flex items-center gap-1.5"
+            >
+              <PlusCircle size={14} />
+              <span>إضافة بطاقة تجريبية للعرض</span>
+            </button>
           </div>
         )}
       </div>
