@@ -59,8 +59,12 @@ export default function TeacherVerification() {
       }
 
       setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
-      setSelectedTeacher(null);
       
+      if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
+        setSelectedTeacher({ ...selectedTeacher, status: newStatus });
+      }
+
+      setSelectedTeacher(null);
     } catch (err: any) {
       alert("حدث خطأ أثناء تحديث الحالة: " + err.message);
     }
@@ -110,9 +114,9 @@ export default function TeacherVerification() {
     <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6 min-h-screen bg-slate-50" dir="rtl">
       
       {/* رأس الصفحة */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100/60 shadow-inner">
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100 shadow-inner">
             <ShieldCheck size={26} />
           </div>
           <div>
@@ -120,7 +124,7 @@ export default function TeacherVerification() {
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              إدارة ومراجعة هويات وبطاقات المعلمين المسجلين بكل سهولة
+              إدارة ومراجعة هويات وبطاقات المعلمين المسجلين
             </p>
           </div>
         </div>
@@ -129,10 +133,10 @@ export default function TeacherVerification() {
           <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input 
             type="text" 
-            placeholder="بحث بالاسم أو البريد الإلكتروني..." 
+            placeholder="بحث بالاسم أو البريد..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-sm"
+            className="w-full pl-3 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-sm"
           />
         </div>
       </div>
@@ -141,32 +145,32 @@ export default function TeacherVerification() {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button 
           onClick={() => setActiveTab("all")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "all" ? "bg-purple-600 text-white shadow-purple-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "all" ? "bg-purple-600 text-white shadow-sm shadow-purple-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           كل الطلبات ({teachers.length})
         </button>
         <button 
           onClick={() => setActiveTab("pending")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "pending" ? "bg-amber-500 text-white shadow-amber-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "pending" ? "bg-amber-500 text-white shadow-sm shadow-amber-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           قيد المراجعة ({teachers.filter(t => t.status === 'pending' || !t.status).length})
         </button>
         <button 
           onClick={() => setActiveTab("approved")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-emerald-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-sm shadow-emerald-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           الموافق عليها ({teachers.filter(t => t.status === 'approved').length})
         </button>
         <button 
           onClick={() => setActiveTab("rejected")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "rejected" ? "bg-rose-600 text-white shadow-rose-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "rejected" ? "bg-rose-600 text-white shadow-sm shadow-rose-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           المرفوضة ({teachers.filter(t => t.status === 'rejected').length})
         </button>
       </div>
 
-      {/* شبكة الكروت بحجم مناسب ومرتب مع إمكانية التمرير (Scroll) */}
-      <div className="max-h-[68vh] overflow-y-auto pr-1 pl-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* شبكة الكروت بحجم مناسب وتصميم أنيق مع تفعيل الـ Scroll */}
+      <div className="max-h-[72vh] overflow-y-auto pr-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => {
             const teacherName = teacher.full_name || teacher.name || "معلم بدون اسم";
@@ -174,25 +178,26 @@ export default function TeacherVerification() {
             return (
               <div 
                 key={recordId} 
-                className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-fit"
+                className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-fit gap-3"
               >
                 <div>
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
+                  {/* رأس الكارت (الصورة الرمزية والاسم والحالة) */}
+                  <div className="flex items-start justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
                         {teacherName.charAt(0)}
                       </div>
                       <div className="min-w-0">
                         <h3 className="font-bold text-slate-900 text-xs truncate">
                           {teacherName}
                         </h3>
-                        <span className="text-[11px] text-slate-400 block truncate mt-0.5">
+                        <span className="text-[10px] text-slate-400 block truncate">
                           {teacher.role || "معلم"}
                         </span>
                       </div>
                     </div>
 
-                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shrink-0 ${
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold shrink-0 ${
                       teacher.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                       teacher.status === 'rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 
                       'bg-amber-50 text-amber-600 border border-amber-100'
@@ -201,24 +206,26 @@ export default function TeacherVerification() {
                     </span>
                   </div>
 
-                  <div className="space-y-1.5 py-2.5 border-y border-slate-100 my-2.5 text-xs text-slate-600">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1.5"><Mail size={12}/> البريد:</span>
-                      <span className="font-medium text-slate-700 truncate max-w-[170px]" title={teacher.email}>{teacher.email}</span>
+                  {/* بيانات التواصل المصغرة داخل الكارت */}
+                  <div className="space-y-1.5 py-2.5 border-y border-slate-100 text-xs text-slate-600 bg-slate-50/50 p-2.5 rounded-xl">
+                    <div className="flex items-center gap-2">
+                      <Mail size={13} className="text-slate-400 shrink-0" />
+                      <span className="font-medium text-slate-700 truncate">{teacher.email}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1.5"><Phone size={12}/> الهاتف:</span>
+                    <div className="flex items-center gap-2">
+                      <Phone size={13} className="text-slate-400 shrink-0" />
                       <span className="font-medium text-slate-700" dir="ltr">{teacher.phone || "غير متوفر"}</span>
                     </div>
-                    {teacher.country && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1.5"><MapPin size={12}/> الدولة:</span>
-                        <span className="font-medium text-slate-700 truncate max-w-[150px]">{teacher.country}</span>
+                    {teacher.city && (
+                      <div className="flex items-center gap-2">
+                        <MapPin size={13} className="text-slate-400 shrink-0" />
+                        <span className="font-medium text-slate-700 truncate">{teacher.city}</span>
                       </div>
                     )}
                   </div>
                 </div>
 
+                {/* أزرار الإجراءات في الكارت */}
                 <div className="flex items-center gap-2 pt-1">
                   <button 
                     onClick={() => setSelectedTeacher(teacher)}
@@ -229,8 +236,8 @@ export default function TeacherVerification() {
                   </button>
                   <button 
                     onClick={() => handleDelete(recordId)}
-                    title="حذف السجل"
-                    className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-600 hover:text-white transition-all"
+                    title="حذف"
+                    className="p-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-400 hover:bg-rose-600 hover:text-white hover:border-rose-600 transition-all shadow-sm"
                   >
                     <Trash2 size={14} />
                   </button>
@@ -240,9 +247,9 @@ export default function TeacherVerification() {
             );
           })
         ) : (
-          <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 space-y-2 shadow-sm">
+          <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 space-y-2">
             <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-slate-500 text-xs">لا توجد طلبات مطابقة للبحث الحالي.</p>
+            <p className="text-slate-500 text-xs font-medium">لا توجد بيانات مطابقة للبحث الحالي.</p>
           </div>
         )}
       </div>
@@ -250,7 +257,7 @@ export default function TeacherVerification() {
       {/* مودال التفاصيل وبطاقة الهوية */}
       {selectedTeacher && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-100">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto">
             
             <button 
               onClick={() => setSelectedTeacher(null)}
@@ -260,16 +267,15 @@ export default function TeacherVerification() {
             </button>
 
             <h2 className="text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
-              تفاصيل وملف المعلم الشخصي
+              تفاصيل وملف المعلم
             </h2>
 
             <div className="space-y-2 text-xs text-slate-700 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner">
-              <p><strong>الاسم الكامل:</strong> {selectedTeacher.full_name || selectedTeacher.name}</p>
-              <p><strong>البريد الإلكتروني:</strong> {selectedTeacher.email}</p>
-              <p><strong>رقم الهاتف:</strong> <span dir="ltr">{selectedTeacher.phone || "غير متوفر"}</span></p>
-              {selectedTeacher.country && <p><strong>الدولة:</strong> {selectedTeacher.country}</p>}
+              <p><strong>الاسم:</strong> {selectedTeacher.full_name || selectedTeacher.name}</p>
+              <p><strong>البريد:</strong> {selectedTeacher.email}</p>
+              <p><strong>الهاتف:</strong> <span dir="ltr">{selectedTeacher.phone || "غير متوفر"}</span></p>
               {selectedTeacher.city && <p><strong>المدينة:</strong> {selectedTeacher.city}</p>}
-              {selectedTeacher.bio && <p><strong>النبذة:</strong> {selectedTeacher.bio}</p>}
+              {selectedTeacher.country && <p><strong>الدولة:</strong> {selectedTeacher.country}</p>}
             </div>
 
             {/* عرض صور البطاقة */}
@@ -279,7 +285,6 @@ export default function TeacherVerification() {
               </span>
               
               <div className="grid grid-cols-2 gap-3">
-                {/* الوجه الأمامي */}
                 <div 
                   onClick={() => getFrontImage(selectedTeacher) && setZoomedImage(getFrontImage(selectedTeacher))}
                   className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-32 flex items-center justify-center cursor-pointer shadow-sm"
@@ -294,7 +299,6 @@ export default function TeacherVerification() {
                   </span>
                 </div>
 
-                {/* الوجه الخلفي */}
                 <div 
                   onClick={() => getBackImage(selectedTeacher) && setZoomedImage(getBackImage(selectedTeacher))}
                   className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-32 flex items-center justify-center cursor-pointer shadow-sm"
