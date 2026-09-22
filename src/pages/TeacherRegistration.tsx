@@ -112,7 +112,7 @@ export default function TeacherVerification() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-8 min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/20 to-slate-100" dir="rtl">
+    <div className="max-w-9xl mx-auto space-y-6 p-4 md:p-8 min-h-screen " dir="rtl">
       
       {/* رأس الصفحة الاحترافي */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/80 backdrop-blur-md p-6 rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/40">
