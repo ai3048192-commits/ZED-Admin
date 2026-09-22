@@ -1,401 +1,516 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  UserCheck, 
-  Search, 
-  CheckCircle2, 
-  XCircle, 
-  Eye, 
-  Trash2, 
-  FileText, 
-  X,
-  Sparkles,
+import { useCallback, useEffect, useState } from "react";
+import {
   AlertCircle,
+  CheckCircle2,
+  Eye,
+  FileText,
+  Loader2,
   Maximize2,
-  Loader2
-} from 'lucide-react';
-import { supabase } from '../lib/supabaseClient';
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Trash2,
+  UserCheck,
+  X,
+  XCircle,
+} from "lucide-react";
+import { supabase } from "../lib/supabaseClient";
+
+/* ================================================================== */
+/*  Types & helpers                                                   */
+/* ================================================================== */
+
+type Status = "pending" | "approved" | "rejected";
+type Access = "loading" | "guest" | "not-admin" | "admin";
+
+interface Teacher {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  date: string;
+  idCardFront: string;
+  idCardBack: string;
+  status: Status;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Row = Record<string, any>;
+
+const errorMessage = (err: unknown): string => {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err) return String((err as { message: unknown }).message);
+  return String(err);
+};
+
+const toTeacher = (t: Row): Teacher => ({
+  id: t.user_id,
+  name: t.name || "مدرس بدون اسم",
+  // الكود القديم كان بيحط test@teacher.com لأي معلم مالوش إيميل، فالأدمن
+  // كان ممكن يفتكره إيميل حقيقي
+  email: t.email || "بدون بريد",
+  phone: t.phone || "غير متوفر",
+  subject: t.role || "مدرس",
+  date: t.updated_at ? String(t.updated_at).split("T")[0] : "حديث",
+  idCardFront: t.id_front_url || "",
+  idCardBack: t.id_back_url || "",
+  status: t.status === "approved" || t.status === "rejected" ? t.status : "pending",
+});
+
+/* ================================================================== */
+/*  الصفحة                                                             */
+/* ================================================================== */
 
 export default function TeacherVerification() {
-  const [teachers, setTeachers] = useState<any[]>([]);
+  const [access, setAccess] = useState<Access>("loading");
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeTab, setActiveTab] = useState("all");
-  const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<"all" | Status>("all");
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTeachersData();
-  }, []);
-
-  const fetchTeachersData = async () => {
+  const fetchTeachersData = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
     try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('teachers_profile')
-        .select('*');
-
-      if (error) throw error;
-
-      if (data) {
-        // تحويل البيانات لتناسب هيكل العرض في صفحة الإدارة
-        const formattedTeachers = data.map((t: any) => ({
-          id: t.user_id,
-          name: t.name || "مدرس بدون اسم",
-          email: t.email || "test@teacher.com",
-          phone: t.phone || "غير متوفر",
-          subject: t.role || "مدرس خبير",
-          date: t.updated_at ? t.updated_at.split('T')[0] : "حديث",
-          idCardFront: t.id_front_url || "",
-          idCardBack: t.id_back_url || "",
-          status: t.status || "pending" // تأكد من إضافة حقل status في الجدول إذا رغبت، أو افتراضي pending
-        }));
-        setTeachers(formattedTeachers);
+      // التأكد إن اللي فاتح الصفحة أدمن فعلاً.
+      // من غير ده، الصفحة كانت بتطلع فاضية من غير ما حد يعرف ليه:
+      // RLS بترجّع للمستخدم العادي سجله هو بس (أو ولا حاجة).
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) {
+        setAccess("guest");
+        return;
       }
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", auth.user.id).maybeSingle();
+      if (profile?.role !== "admin") {
+        setAccess("not-admin");
+        return;
+      }
+      setAccess("admin");
+
+      const { data, error } = await supabase
+        .from("teachers_profile")
+        .select("*")
+        .order("updated_at", { ascending: false });
+      if (error) throw error;
+      setTeachers((data ?? []).map(toTeacher));
     } catch (err) {
       console.error("خطأ في جلب بيانات المعلمين:", err);
+      setLoadError(errorMessage(err));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleStatusChange = async (id: string, newStatus: string) => {
+  useEffect(() => {
+    void fetchTeachersData();
+  }, [fetchTeachersData]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      if (zoomedImage) setZoomedImage(null);
+      else setSelectedTeacher(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zoomedImage]);
+
+  const handleStatusChange = async (id: string, newStatus: Status) => {
+    setBusyId(id);
     try {
-      // تحديث الحالة في قاعدة البيانات
-      const { error } = await supabase
-        .from('teachers_profile')
+      const { data, error } = await supabase
+        .from("teachers_profile")
         .update({ status: newStatus })
-        .eq('user_id', id);
-
+        .eq("user_id", id)
+        .select("user_id");
       if (error) throw error;
+      // لو RLS رفضت، Supabase مش بيرمي خطأ، بيرجّع 0 صف بس
+      if (!data?.length) throw new Error("لم يتم التحديث. تأكد إن حسابك أدمن وإن ملف admin_access.sql متشغّل.");
 
-      setTeachers(teachers.map(t => t.id === id ? { ...t, status: newStatus } : t));
-      if (selectedTeacher && selectedTeacher.id === id) {
-        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
-      }
-    } catch (err: any) {
-      alert("خطأ أثناء تحديث الحالة: " + err.message);
+      setTeachers((prev) => prev.map((t) => (t.id === id ? { ...t, status: newStatus } : t)));
+      setSelectedTeacher((prev) => (prev && prev.id === id ? { ...prev, status: newStatus } : prev));
+    } catch (err) {
+      alert("خطأ أثناء تحديث الحالة: " + errorMessage(err));
+    } finally {
+      setBusyId(null);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) return;
+    if (!window.confirm("هل أنت متأكد من حذف هذا السجل نهائياً؟")) return;
+    setBusyId(id);
     try {
-      const { error } = await supabase
-        .from('teachers_profile')
-        .delete()
-        .eq('user_id', id);
-
+      const { data, error } = await supabase.from("teachers_profile").delete().eq("user_id", id).select("user_id");
       if (error) throw error;
+      if (!data?.length) throw new Error("لم يتم الحذف. تأكد إن حسابك أدمن وإن ملف admin_access.sql متشغّل.");
 
-      setTeachers(teachers.filter(t => t.id !== id));
-      if (selectedTeacher && selectedTeacher.id === id) {
-        setSelectedTeacher(null);
-      }
-    } catch (err: any) {
-      alert("خطأ أثناء الحذف: " + err.message);
+      setTeachers((prev) => prev.filter((t) => t.id !== id));
+      setSelectedTeacher((prev) => (prev && prev.id === id ? null : prev));
+    } catch (err) {
+      alert("خطأ أثناء الحذف: " + errorMessage(err));
+    } finally {
+      setBusyId(null);
     }
   };
 
-  const filteredTeachers = teachers.filter(t => {
-    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.subject.toLowerCase().includes(searchTerm.toLowerCase());
-    if (activeTab === "pending") return matchesSearch && t.status === "pending";
-    if (activeTab === "approved") return matchesSearch && t.status === "approved";
-    if (activeTab === "rejected") return matchesSearch && t.status === "rejected";
-    return matchesSearch;
+  const q = searchTerm.toLowerCase();
+  const filteredTeachers = teachers.filter((t) => {
+    const matchesSearch =
+      t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || t.subject.toLowerCase().includes(q);
+    return matchesSearch && (activeTab === "all" || t.status === activeTab);
   });
 
-  if (loading) {
+  const count = (s: Status) => teachers.filter((t) => t.status === s).length;
+
+  /* ---------- الحالات قبل العرض ---------- */
+
+  if (access === "loading" || (access === "admin" && loading)) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-purple-600 font-bold bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 font-bold text-purple-600">
         <Loader2 size={36} className="animate-spin" />
       </div>
     );
   }
 
+  if (access === "guest" || access === "not-admin") {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-4" dir="rtl">
+        <div className="max-w-md space-y-3 rounded-[32px] border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <ShieldAlert size={36} className="mx-auto text-rose-500" />
+          <h1 className="text-lg font-black text-slate-900">
+            {access === "guest" ? "يجب تسجيل الدخول بحساب الإدارة" : "هذه الصفحة مخصصة للإدارة فقط"}
+          </h1>
+          <p className="text-xs leading-relaxed text-slate-500">
+            {access === "guest"
+              ? "سجّل الدخول بحساب الأدمن لعرض طلبات توثيق المعلمين."
+              : "حسابك الحالي ليس حساب أدمن. يتم تفعيل حسابات الإدارة من قاعدة البيانات فقط."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---------- الصفحة ---------- */
+
   return (
-    <div className=" space-y-8 min-h-screen" dir="rtl">
-      
-      {/* رأس الصفحة الاحترافي */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[32px] border border-slate-200/85 shadow-sm relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="p-4 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100 shadow-sm shrink-0">
+    <div className="min-h-screen space-y-8" dir="rtl">
+      <div className="relative flex flex-col justify-between gap-6 overflow-hidden rounded-[32px] border border-slate-200/85 bg-white p-8 shadow-sm md:flex-row md:items-center">
+        <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-purple-500/5 blur-2xl" />
+
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="shrink-0 rounded-2xl border border-purple-100 bg-purple-50 p-4 text-purple-600 shadow-sm">
             <UserCheck size={32} />
           </div>
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-50 text-purple-600 text-xs font-bold mb-2">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-purple-50 px-3 py-1 text-xs font-bold text-purple-600">
               <Sparkles size={12} />
               <span>لوحة الاعتمادات والتوثيق</span>
             </div>
-            <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-              توثيق حسابات المعلمين
-            </h1>
-            <p className="text-xs lg:text-sm text-slate-500 font-medium mt-1">
-              استعرض بيانات المعلمين القادمة من الملف الشخصي (Profile) وراجع هوياتهم الشخصية.
+            <h1 className="text-2xl font-black tracking-tight text-slate-900 lg:text-3xl">توثيق حسابات المعلمين</h1>
+            <p className="mt-1 text-xs font-medium text-slate-500 lg:text-sm">
+              راجع بيانات المعلمين وصور هوياتهم الشخصية، ووثّق الحسابات أو ارفضها.
             </p>
           </div>
         </div>
 
-        {/* شريط البحث */}
-        <div className="relative w-full md:w-80 z-10">
+        <div className="relative z-10 w-full md:w-80">
           <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="بحث بالاسم، البريد، أو المادة..." 
+          <input
+            type="search"
+            placeholder="بحث بالاسم، البريد، أو المادة..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-4 pr-11 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-medium text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-inner"
+            className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-4 pr-11 text-xs font-medium text-slate-800 shadow-inner transition-all focus:border-purple-500 focus:bg-white focus:outline-none"
           />
         </div>
       </div>
 
-      {/* تبويبات الفلترة السريعة */}
+      {loadError && (
+        <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-xs font-bold text-rose-700">
+          <AlertCircle size={18} className="shrink-0" />
+          <span>تعذّر جلب بيانات المعلمين: {loadError}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-2 overflow-x-auto pb-2">
-        <button 
-          onClick={() => setActiveTab("all")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${activeTab === "all" ? "bg-purple-600 text-white shadow-lg shadow-purple-600/20" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
-        >
-          كل الطلبات ({teachers.length})
-        </button>
-        <button 
-          onClick={() => setActiveTab("pending")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${activeTab === "pending" ? "bg-amber-500 text-white shadow-lg shadow-amber-500/20" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
-        >
-          قيد المراجعة ({teachers.filter(t => t.status === 'pending').length})
-        </button>
-        <button 
-          onClick={() => setActiveTab("approved")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
-        >
-          المقبولة ({teachers.filter(t => t.status === 'approved').length})
-        </button>
-        <button 
-          onClick={() => setActiveTab("rejected")}
-          className={`px-5 py-2.5 rounded-2xl text-xs font-bold transition-all shrink-0 ${activeTab === "rejected" ? "bg-rose-600 text-white shadow-lg shadow-rose-600/20" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
-        >
-          المرفوضة ({teachers.filter(t => t.status === 'rejected').length})
-        </button>
+        {(
+          [
+            ["all", `كل الطلبات (${teachers.length})`, "bg-purple-600 shadow-purple-600/20"],
+            ["pending", `قيد المراجعة (${count("pending")})`, "bg-amber-500 shadow-amber-500/20"],
+            ["approved", `المقبولة (${count("approved")})`, "bg-emerald-600 shadow-emerald-600/20"],
+            ["rejected", `المرفوضة (${count("rejected")})`, "bg-rose-600 shadow-rose-600/20"],
+          ] as const
+        ).map(([key, label, activeCls]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+            className={`shrink-0 rounded-2xl px-5 py-2.5 text-xs font-bold transition-all ${
+              activeTab === key
+                ? `${activeCls} text-white shadow-lg`
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* شبكة الكروت (Grid) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => (
-            <div 
+            <div
               key={teacher.id}
-              className="group bg-white border border-slate-200/80 rounded-[28px] p-6 shadow-sm hover:shadow-xl hover:border-purple-200 transition-all duration-300 flex flex-col justify-between relative overflow-hidden"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-[28px] border border-slate-200/80 bg-white p-6 shadow-sm transition-all duration-300 hover:border-purple-200 hover:shadow-xl"
             >
-              <div className="absolute top-0 right-0 left-0 h-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-purple-500 to-indigo-500 opacity-0 transition-opacity group-hover:opacity-100" />
 
               <div>
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center font-black text-base border border-purple-100 shadow-sm shrink-0">
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-purple-100 bg-purple-50 text-base font-black text-purple-600 shadow-sm">
                       {teacher.name.charAt(0)}
                     </div>
-                    <div>
-                      <h3 className="font-extrabold text-slate-900 text-sm group-hover:text-purple-600 transition-colors">
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-extrabold text-slate-900 transition-colors group-hover:text-purple-600">
                         {teacher.name}
                       </h3>
-                      <span className="text-[11px] text-slate-400 font-medium block">
+                      <span dir="ltr" className="block truncate text-right text-[11px] font-medium text-slate-400">
                         {teacher.email}
                       </span>
                     </div>
                   </div>
 
-                  {/* الحالة */}
-                  <div>
-                    {teacher.status === 'pending' && (
-                      <span className="px-3 py-1 rounded-full bg-amber-50 text-amber-600 border border-amber-200/60 text-[10px] font-bold inline-flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                        قيد المراجعة
-                      </span>
-                    )}
-                    {teacher.status === 'approved' && (
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60 text-[10px] font-bold inline-flex items-center gap-1">
-                        <CheckCircle2 size={12} />
-                        تم التوثيق
-                      </span>
-                    )}
-                    {teacher.status === 'rejected' && (
-                      <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200/60 text-[10px] font-bold inline-flex items-center gap-1">
-                        <XCircle size={12} />
-                        مرفوض
-                      </span>
-                    )}
-                  </div>
+                  <StatusBadge status={teacher.status} />
                 </div>
 
-                <div className="space-y-2 py-3 border-y border-slate-100 my-4 text-xs font-medium text-slate-600">
+                <div className="my-4 space-y-2 border-y border-slate-100 py-3 text-xs font-medium text-slate-600">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">الدور / المادة:</span>
-                    <span className="font-bold text-slate-800 bg-slate-100 px-2.5 py-0.5 rounded-lg">
-                      {teacher.subject}
-                    </span>
+                    <span className="rounded-lg bg-slate-100 px-2.5 py-0.5 font-bold text-slate-800">{teacher.subject}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400">رقم الهاتف:</span>
-                    <span className="font-semibold text-slate-800" dir="ltr">{teacher.phone}</span>
+                    <span className="font-semibold text-slate-800" dir="ltr">
+                      {teacher.phone}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-2 pt-2">
-                <button 
+                <button
+                  type="button"
                   onClick={() => setSelectedTeacher(teacher)}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-purple-50 px-4 py-2.5 text-xs font-bold text-purple-600 shadow-sm transition-all hover:bg-purple-600 hover:text-white"
                 >
                   <Eye size={15} />
-                  <span>عرض التفاصيل والبطاقة</span>
+                  عرض التفاصيل والبطاقة
                 </button>
-                <button 
-                  onClick={() => handleDelete(teacher.id)}
+                <button
+                  type="button"
+                  onClick={() => void handleDelete(teacher.id)}
+                  disabled={busyId === teacher.id}
                   title="حذف الطلب"
-                  className="p-2.5 rounded-xl bg-slate-100 text-slate-500 hover:bg-rose-600 hover:text-white transition-all shadow-sm"
+                  aria-label={`حذف ${teacher.name}`}
+                  className="rounded-xl bg-slate-100 p-2.5 text-slate-500 shadow-sm transition-all hover:bg-rose-600 hover:text-white disabled:opacity-60"
                 >
-                  <Trash2 size={16} />
+                  {busyId === teacher.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                 </button>
               </div>
-
             </div>
           ))
         ) : (
-          <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-slate-200">
-            <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-slate-500 font-bold text-sm">لا توجد طلبات معلمين مسجلة في قاعدة البيانات حتى الآن.</p>
+          <div className="col-span-full rounded-3xl border border-slate-200 bg-white py-16 text-center">
+            <AlertCircle className="mx-auto mb-3 h-12 w-12 text-slate-300" />
+            <p className="text-sm font-bold text-slate-500">
+              {teachers.length === 0 ? "لا توجد طلبات معلمين مسجلة حتى الآن." : "لا توجد نتائج مطابقة."}
+            </p>
           </div>
         )}
       </div>
 
-      {/* كارت التفاصيل الكاملة */}
       {selectedTeacher && (
-        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[32px] max-w-2xl w-full p-8 relative shadow-2xl max-h-[90vh] overflow-y-auto">
-            
-            <button 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-md"
+          onMouseDown={(e) => e.target === e.currentTarget && setSelectedTeacher(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="relative max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-[32px] bg-white p-8 shadow-2xl"
+          >
+            <button
+              type="button"
               onClick={() => setSelectedTeacher(null)}
-              className="absolute top-6 left-6 p-2 rounded-2xl bg-slate-100 text-slate-500 hover:text-slate-900 transition-colors z-10"
+              aria-label="إغلاق"
+              className="absolute left-6 top-6 z-10 rounded-2xl bg-slate-100 p-2 text-slate-500 transition-colors hover:text-slate-900"
             >
               <X size={18} />
             </button>
 
-            <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100">
-              <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center font-black text-2xl shadow-inner shrink-0">
+            <div className="mb-6 flex items-center gap-4 border-b border-slate-100 pb-6">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-purple-100 text-2xl font-black text-purple-600 shadow-inner">
                 {selectedTeacher.name.charAt(0)}
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-900">{selectedTeacher.name}</h2>
-                <span className="text-xs text-purple-600 font-semibold">{selectedTeacher.subject}</span>
+                <span className="text-xs font-semibold text-purple-600">{selectedTeacher.subject}</span>
+              </div>
+              <div className="mr-auto">
+                <StatusBadge status={selectedTeacher.status} />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6 text-xs">
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <span className="text-slate-400 block mb-1">البريد الإلكتروني</span>
-                <span className="font-bold text-slate-800">{selectedTeacher.email}</span>
+            <div className="mb-6 grid grid-cols-2 gap-4 text-xs">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <span className="mb-1 block text-slate-400">البريد الإلكتروني</span>
+                <span dir="ltr" className="block break-all text-right font-bold text-slate-800">
+                  {selectedTeacher.email}
+                </span>
               </div>
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <span className="text-slate-400 block mb-1">رقم الهاتف</span>
-                <span className="font-bold text-slate-800" dir="ltr">{selectedTeacher.phone}</span>
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <span className="mb-1 block text-slate-400">رقم الهاتف</span>
+                <span className="font-bold text-slate-800" dir="ltr">
+                  {selectedTeacher.phone}
+                </span>
               </div>
             </div>
 
-            {/* معاينة صور البطاقة */}
             <div className="mb-6">
-              <span className="text-xs font-bold text-slate-700 block mb-3 flex items-center gap-1.5">
+              <span className="mb-3 flex items-center gap-1.5 text-xs font-bold text-slate-700">
                 <FileText size={16} className="text-purple-600" />
-                <span>صور بطاقة الهوية (اضغط للتكبير):</span>
+                صور بطاقة الهوية (اضغط للتكبير):
               </span>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div 
-                  onClick={() => selectedTeacher.idCardFront && setZoomedImage(selectedTeacher.idCardFront)}
-                  className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 h-40 flex items-center justify-center cursor-pointer shadow-sm hover:shadow-lg transition-all"
-                >
-                  {selectedTeacher.idCardFront ? (
-                    <img src={selectedTeacher.idCardFront} alt="ID Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100" />
-                  ) : (
-                    <span className="text-xs text-slate-400 font-bold">لا توجد صورة وجه للبطاقة</span>
-                  )}
-                  {selectedTeacher.idCardFront && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2">
-                      <Maximize2 size={24} />
-                      <span className="text-xs font-bold">تكبير الوجه الأمامي</span>
-                    </div>
-                  )}
-                  <span className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-[10px] font-bold rounded-lg backdrop-blur-sm">الوجه الأمامي</span>
-                </div>
-
-                <div 
-                  onClick={() => selectedTeacher.idCardBack && setZoomedImage(selectedTeacher.idCardBack)}
-                  className="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 h-40 flex items-center justify-center cursor-pointer shadow-sm hover:shadow-lg transition-all"
-                >
-                  {selectedTeacher.idCardBack ? (
-                    <img src={selectedTeacher.idCardBack} alt="ID Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90 group-hover:opacity-100" />
-                  ) : (
-                    <span className="text-xs text-slate-400 font-bold">لا توجد صورة ظهر للبطاقة</span>
-                  )}
-                  {selectedTeacher.idCardBack && (
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2">
-                      <Maximize2 size={24} />
-                      <span className="text-xs font-bold">تكبير الوجه الخلفي</span>
-                    </div>
-                  )}
-                  <span className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-[10px] font-bold rounded-lg backdrop-blur-sm">الوجه الخلفي</span>
-                </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <IdImage src={selectedTeacher.idCardFront} label="الوجه الأمامي" onZoom={setZoomedImage} />
+                <IdImage src={selectedTeacher.idCardBack} label="الوجه الخلفي" onZoom={setZoomedImage} />
               </div>
             </div>
 
-            {/* أزرار القرار */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <span className="text-xs font-bold text-slate-500 block">اتخاذ القرار النهائي للتوثيق:</span>
+            <div className="space-y-3 border-t border-slate-100 pt-4">
+              <span className="block text-xs font-bold text-slate-500">اتخاذ القرار النهائي للتوثيق:</span>
               <div className="grid grid-cols-2 gap-3">
-                <button 
-                  onClick={() => handleStatusChange(selectedTeacher.id, 'approved')}
-                  className={`py-3.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${selectedTeacher.status === 'approved' ? 'bg-emerald-600 text-white ring-2 ring-emerald-600 ring-offset-2' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+                <button
+                  type="button"
+                  onClick={() => void handleStatusChange(selectedTeacher.id, "approved")}
+                  disabled={busyId === selectedTeacher.id}
+                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-xs font-bold shadow-md transition-all disabled:opacity-60 ${
+                    selectedTeacher.status === "approved"
+                      ? "bg-emerald-600 text-white ring-2 ring-emerald-600 ring-offset-2"
+                      : "bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                  }`}
                 >
                   <CheckCircle2 size={16} />
-                  <span>موافق (توثيق الحساب)</span>
+                  موافق (توثيق الحساب)
                 </button>
-                <button 
-                  onClick={() => handleStatusChange(selectedTeacher.id, 'rejected')}
-                  className={`py-3.5 px-4 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md ${selectedTeacher.status === 'rejected' ? 'bg-rose-600 text-white ring-2 ring-rose-600 ring-offset-2' : 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white'}`}
+                <button
+                  type="button"
+                  onClick={() => void handleStatusChange(selectedTeacher.id, "rejected")}
+                  disabled={busyId === selectedTeacher.id}
+                  className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-3.5 text-xs font-bold shadow-md transition-all disabled:opacity-60 ${
+                    selectedTeacher.status === "rejected"
+                      ? "bg-rose-600 text-white ring-2 ring-rose-600 ring-offset-2"
+                      : "bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white"
+                  }`}
                 >
                   <XCircle size={16} />
-                  <span>رفض الطلب</span>
+                  رفض الطلب
                 </button>
               </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* نافذة تكبير الصورة */}
       {zoomedImage && (
-        <div 
-          className="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-4 md:p-10"
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4 md:p-10"
           onClick={() => setZoomedImage(null)}
         >
-          <button 
-            onClick={(e) => { e.stopPropagation(); setZoomedImage(null); }}
-            className="absolute top-6 right-6 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-all z-10"
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setZoomedImage(null);
+            }}
+            aria-label="إغلاق"
+            className="absolute right-6 top-6 z-10 rounded-full bg-white/10 p-3 text-white transition-all hover:bg-white/20"
           >
             <X size={24} />
           </button>
-          
-          <img 
-            src={zoomedImage} 
-            alt="Zoomed ID Card" 
-            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+          <img
+            src={zoomedImage}
+            alt="صورة البطاقة مكبّرة"
+            className="max-h-[90vh] max-w-full rounded-xl object-contain shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
         </div>
       )}
-
     </div>
+  );
+}
+
+/* ================================================================== */
+/*  مكونات صغيرة                                                        */
+/* ================================================================== */
+
+function StatusBadge({ status }: { status: Status }) {
+  if (status === "approved") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-200/60 bg-emerald-50 px-3 py-1 text-[10px] font-bold text-emerald-600">
+        <CheckCircle2 size={12} />
+        تم التوثيق
+      </span>
+    );
+  }
+  if (status === "rejected") {
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-rose-200/60 bg-rose-50 px-3 py-1 text-[10px] font-bold text-rose-600">
+        <XCircle size={12} />
+        مرفوض
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200/60 bg-amber-50 px-3 py-1 text-[10px] font-bold text-amber-600">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+      قيد المراجعة
+    </span>
+  );
+}
+
+function IdImage({ src, label, onZoom }: { src: string; label: string; onZoom: (s: string) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => src && onZoom(src)}
+      disabled={!src}
+      className="group relative flex h-40 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-sm transition-all hover:shadow-lg disabled:cursor-default"
+    >
+      {src ? (
+        <img
+          src={src}
+          alt={label}
+          className="h-full w-full object-cover opacity-90 transition-transform duration-500 group-hover:scale-105 group-hover:opacity-100"
+        />
+      ) : (
+        <span className="text-xs font-bold text-slate-400">لم يرفع المعلم صورة {label}</span>
+      )}
+      {src && (
+        <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/40 text-white opacity-0 transition-opacity group-hover:opacity-100">
+          <Maximize2 size={24} />
+          <span className="text-xs font-bold">تكبير {label}</span>
+        </span>
+      )}
+      <span className="absolute bottom-2 right-2 rounded-lg bg-black/60 px-2 py-1 text-[10px] font-bold text-white backdrop-blur-sm">
+        {label}
+      </span>
+    </button>
   );
 }
