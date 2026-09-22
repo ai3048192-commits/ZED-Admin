@@ -43,11 +43,34 @@ export default function TeacherVerification() {
     }
   };
 
-  const handleStatusChange = (id: string, newStatus: string) => {
-    // التحديث محلياً مباشرة لتجنب الأخطاء
-    setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
-    if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
-      setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      // تحديث الحالة في قاعدة بيانات Supabase
+      // نفترض أن المفتاح الرئيسي هو id أو user_id بناءً على هيكل الجدول
+      const targetTeacher = teachers.find(t => t.id === id || t.user_id === id);
+      const queryId = targetTeacher?.user_id || id;
+
+      const { error } = await supabase
+        .from('teachers_profile')
+        .update({ status: newStatus })
+        .eq('user_id', queryId);
+
+      // في حال كان العمود المعرف الرئيسي هو id وليس user_id ولم يتم التحديث، نجرب المراجعة عبر id
+      if (error) {
+        await supabase
+          .from('teachers_profile')
+          .update({ status: newStatus })
+          .eq('id', id);
+      }
+
+      // التحديث محلياً بعد نجاح الاتصال بقاعدة البيانات
+      setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
+      if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
+        setSelectedTeacher((prev: any) => ({ ...prev, status: newStatus }));
+      }
+    } catch (err: any) {
+      console.error("خطأ أثناء تحديث الحالة:", err.message);
+      alert("حدث خطأ أثناء حفظ الحالة في قاعدة البيانات.");
     }
   };
 
@@ -93,7 +116,7 @@ export default function TeacherVerification() {
   }
 
   return (
-    <div className="max-w-9xl mx-auto space-y-6 p-4 md:p-6 min-h-screen bg-slate-50" dir="rtl">
+    <div className="max-w-9xl mx-auto space-y-6 p-4 md:p-6 min-h-screen " dir="rtl">
       
       {/* رأس الصفحة */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
