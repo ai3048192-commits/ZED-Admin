@@ -9,7 +9,8 @@ import {
   AlertCircle,
   ShieldCheck,
   Phone,
-  Mail
+  Mail,
+  MapPin
 } from 'lucide-react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -32,7 +33,6 @@ export default function TeacherVerification() {
         .from('teachers_profile')
         .select('*');
 
-      console.log("Supabase Data:", data);
       if (error) throw error;
       if (data) setTeachers(data);
     } catch (err: any) {
@@ -42,17 +42,14 @@ export default function TeacherVerification() {
     }
   };
 
-  // تم تحديث الدالة لتحديث قاعدة البيانات والانتقال الفوري لحالة المعلم
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
-      // 1. التحديث في قاعدة البيانات عبر Supabase
       const { error } = await supabase
         .from('teachers_profile')
         .update({ status: newStatus })
         .eq('user_id', id);
 
       if (error) {
-        // تجربة التحديث باستخدام حقل id العادي إذا لم يوجد user_id
         const { error: idError } = await supabase
           .from('teachers_profile')
           .update({ status: newStatus })
@@ -61,15 +58,7 @@ export default function TeacherVerification() {
         if (idError) throw idError;
       }
 
-      // 2. التحديث محلياً في الواجهة فوراً
       setTeachers(prev => prev.map(t => (t.id === id || t.user_id === id) ? { ...t, status: newStatus } : t));
-      
-      // 3. تحديث المعلم المحدد وإغلاق المودال أو الانتقال لصفحته
-      if (selectedTeacher && (selectedTeacher.id === id || selectedTeacher.user_id === id)) {
-        setSelectedTeacher({ ...selectedTeacher, status: newStatus });
-      }
-
-      // إغلاق المودال الحالي (أو الانتقال لصفحة تفاصيله المحدثة)
       setSelectedTeacher(null);
       
     } catch (err: any) {
@@ -121,29 +110,29 @@ export default function TeacherVerification() {
     <div className="max-w-7xl mx-auto space-y-6 p-4 md:p-6 min-h-screen bg-slate-50" dir="rtl">
       
       {/* رأس الصفحة */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
-            <ShieldCheck size={28} />
+          <div className="p-3 bg-purple-50 text-purple-600 rounded-2xl border border-purple-100/60 shadow-inner">
+            <ShieldCheck size={26} />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">
+            <h1 className="text-lg font-bold text-slate-900">
               توثيق حسابات المعلمين
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              إدارة ومراجعة هويات وبطاقات المعلمين المسجلين
+              إدارة ومراجعة هويات وبطاقات المعلمين المسجلين بكل سهولة
             </p>
           </div>
         </div>
 
-        <div className="relative w-full md:w-64">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+        <div className="relative w-full md:w-72">
+          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input 
             type="text" 
-            placeholder="بحث بالاسم أو البريد..." 
+            placeholder="بحث بالاسم أو البريد الإلكتروني..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-3 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all"
+            className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-purple-500 focus:bg-white transition-all shadow-sm"
           />
         </div>
       </div>
@@ -152,32 +141,32 @@ export default function TeacherVerification() {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         <button 
           onClick={() => setActiveTab("all")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "all" ? "bg-purple-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "all" ? "bg-purple-600 text-white shadow-purple-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           كل الطلبات ({teachers.length})
         </button>
         <button 
           onClick={() => setActiveTab("pending")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "pending" ? "bg-amber-500 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "pending" ? "bg-amber-500 text-white shadow-amber-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           قيد المراجعة ({teachers.filter(t => t.status === 'pending' || !t.status).length})
         </button>
         <button 
           onClick={() => setActiveTab("approved")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "approved" ? "bg-emerald-600 text-white shadow-emerald-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           الموافق عليها ({teachers.filter(t => t.status === 'approved').length})
         </button>
         <button 
           onClick={() => setActiveTab("rejected")}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 ${activeTab === "rejected" ? "bg-rose-600 text-white shadow-sm" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 shadow-sm ${activeTab === "rejected" ? "bg-rose-600 text-white shadow-rose-200" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}
         >
           المرفوضة ({teachers.filter(t => t.status === 'rejected').length})
         </button>
       </div>
 
-      {/* شبكة الكروت مع التمريير (Scroll) */}
-      <div className="max-h-[70vh] overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* شبكة الكروت بحجم مناسب ومرتب مع إمكانية التمرير (Scroll) */}
+      <div className="max-h-[68vh] overflow-y-auto pr-1 pl-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredTeachers.length > 0 ? (
           filteredTeachers.map((teacher) => {
             const teacherName = teacher.full_name || teacher.name || "معلم بدون اسم";
@@ -185,12 +174,12 @@ export default function TeacherVerification() {
             return (
               <div 
                 key={recordId} 
-                className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-fit"
+                className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all flex flex-col justify-between h-fit"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
+                      <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
                         {teacherName.charAt(0)}
                       </div>
                       <div className="min-w-0">
@@ -198,12 +187,12 @@ export default function TeacherVerification() {
                           {teacherName}
                         </h3>
                         <span className="text-[11px] text-slate-400 block truncate mt-0.5">
-                          {teacher.email}
+                          {teacher.role || "معلم"}
                         </span>
                       </div>
                     </div>
 
-                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold shrink-0 ${
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold shrink-0 ${
                       teacher.status === 'approved' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                       teacher.status === 'rejected' ? 'bg-rose-50 text-rose-600 border border-rose-100' : 
                       'bg-amber-50 text-amber-600 border border-amber-100'
@@ -212,29 +201,35 @@ export default function TeacherVerification() {
                     </span>
                   </div>
 
-                  <div className="space-y-1.5 py-2.5 border-y border-slate-100 my-3 text-xs text-slate-600">
+                  <div className="space-y-1.5 py-2.5 border-y border-slate-100 my-2.5 text-xs text-slate-600">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1"><Mail size={12}/> البريد:</span>
-                      <span className="font-medium text-slate-700 truncate max-w-[170px]">{teacher.email}</span>
+                      <span className="text-slate-400 flex items-center gap-1.5"><Mail size={12}/> البريد:</span>
+                      <span className="font-medium text-slate-700 truncate max-w-[170px]" title={teacher.email}>{teacher.email}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400 flex items-center gap-1"><Phone size={12}/> الهاتف:</span>
+                      <span className="text-slate-400 flex items-center gap-1.5"><Phone size={12}/> الهاتف:</span>
                       <span className="font-medium text-slate-700" dir="ltr">{teacher.phone || "غير متوفر"}</span>
                     </div>
+                    {teacher.country && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 flex items-center gap-1.5"><MapPin size={12}/> الدولة:</span>
+                        <span className="font-medium text-slate-700 truncate max-w-[150px]">{teacher.country}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
                   <button 
                     onClick={() => setSelectedTeacher(teacher)}
-                    className="flex-1 py-2 px-3 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all font-semibold text-xs flex items-center justify-center gap-1.5"
+                    className="flex-1 py-2 px-3 rounded-xl bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white transition-all font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm"
                   >
                     <Eye size={14} />
                     <span>التفاصيل والهوية</span>
                   </button>
                   <button 
                     onClick={() => handleDelete(recordId)}
-                    title="حذف"
+                    title="حذف السجل"
                     className="p-2 rounded-xl bg-slate-100 text-slate-400 hover:bg-rose-600 hover:text-white transition-all"
                   >
                     <Trash2 size={14} />
@@ -245,9 +240,9 @@ export default function TeacherVerification() {
             );
           })
         ) : (
-          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-slate-200 space-y-2">
+          <div className="col-span-full py-16 text-center bg-white rounded-2xl border border-slate-200 space-y-2 shadow-sm">
             <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
-            <p className="text-slate-500 text-xs">لا توجد بيانات مطابقة للبحث الحالي.</p>
+            <p className="text-slate-500 text-xs">لا توجد طلبات مطابقة للبحث الحالي.</p>
           </div>
         )}
       </div>
@@ -255,7 +250,7 @@ export default function TeacherVerification() {
       {/* مودال التفاصيل وبطاقة الهوية */}
       {selectedTeacher && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 relative shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-100">
             
             <button 
               onClick={() => setSelectedTeacher(null)}
@@ -265,17 +260,19 @@ export default function TeacherVerification() {
             </button>
 
             <h2 className="text-sm font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
-              تفاصيل وملف المعلم
+              تفاصيل وملف المعلم الشخصي
             </h2>
 
-            <div className="space-y-2 text-xs text-slate-700 mb-5 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
-              <p><strong>الاسم:</strong> {selectedTeacher.full_name || selectedTeacher.name}</p>
-              <p><strong>البريد:</strong> {selectedTeacher.email}</p>
-              <p><strong>الهاتف:</strong> <span dir="ltr">{selectedTeacher.phone || "غير متوفر"}</span></p>
+            <div className="space-y-2 text-xs text-slate-700 mb-5 bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-inner">
+              <p><strong>الاسم الكامل:</strong> {selectedTeacher.full_name || selectedTeacher.name}</p>
+              <p><strong>البريد الإلكتروني:</strong> {selectedTeacher.email}</p>
+              <p><strong>رقم الهاتف:</strong> <span dir="ltr">{selectedTeacher.phone || "غير متوفر"}</span></p>
+              {selectedTeacher.country && <p><strong>الدولة:</strong> {selectedTeacher.country}</p>}
               {selectedTeacher.city && <p><strong>المدينة:</strong> {selectedTeacher.city}</p>}
+              {selectedTeacher.bio && <p><strong>النبذة:</strong> {selectedTeacher.bio}</p>}
             </div>
 
-            {/* عرض صور البطاقة القادمة من الـ Profile */}
+            {/* عرض صور البطاقة */}
             <div className="mb-5">
               <span className="text-xs font-bold text-slate-800 block mb-2.5">
                 صور بطاقة الهوية (اضغط للتكبير):
@@ -314,19 +311,19 @@ export default function TeacherVerification() {
               </div>
             </div>
 
-            {/* أزرار القرار */}
+            {/* أزرار القرار (موافق / مرفوض) */}
             <div className="space-y-2 pt-3 border-t border-slate-100">
               <div className="grid grid-cols-2 gap-2">
                 <button 
                   onClick={() => handleStatusChange(selectedTeacher.user_id || selectedTeacher.id, 'approved')}
-                  className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 text-white font-semibold text-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-emerald-200"
                 >
                   <CheckCircle2 size={14} />
                   <span>موافق</span>
                 </button>
                 <button 
                   onClick={() => handleStatusChange(selectedTeacher.user_id || selectedTeacher.id, 'rejected')}
-                  className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  className="py-2.5 px-3 rounded-xl bg-rose-600 text-white font-semibold text-xs hover:bg-rose-700 transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-rose-200"
                 >
                   <XCircle size={14} />
                   <span>مرفوض</span>
