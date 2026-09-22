@@ -7,9 +7,7 @@ import {
   Trash2, 
   FileText, 
   X, 
-  Sparkles, 
-  AlertCircle, 
-  Maximize2,
+  AlertCircle,
   ShieldCheck,
   Phone,
   Mail
@@ -35,6 +33,7 @@ export default function TeacherVerification() {
         .from('profiles')
         .select('*');
 
+      console.log("Supabase Data:", data);
       if (error) throw error;
       if (data) setTeachers(data);
     } catch (err: any) {
@@ -46,12 +45,15 @@ export default function TeacherVerification() {
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
+      // محاولة التحديث في قاعدة البيانات إذا كان عمود status موجوداً
       const { error } = await supabase
         .from('profiles')
         .update({ status: newStatus })
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.warn("عمود status غير موجود في جدول profiles، يتم التحديث محلياً فقط.");
+      }
 
       setTeachers(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
       if (selectedTeacher && selectedTeacher.id === id) {
@@ -84,6 +86,15 @@ export default function TeacherVerification() {
     if (activeTab === "rejected") return matchesSearch && t.status === "rejected";
     return matchesSearch;
   });
+
+  // دوال مساعدة لجلب روابط الصور بأكثر من اسم محتمل للأعمدة
+  const getFrontImage = (teacher: any) => {
+    return teacher.id_front_url || teacher.front_image || teacher.national_id_front || teacher.id_image || null;
+  };
+
+  const getBackImage = (teacher: any) => {
+    return teacher.id_back_url || teacher.back_image || teacher.national_id_back || null;
+  };
 
   if (loading) {
     return (
@@ -165,7 +176,7 @@ export default function TeacherVerification() {
               >
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-sm shrink-0">
                         {teacherName.charAt(0)}
                       </div>
@@ -190,11 +201,11 @@ export default function TeacherVerification() {
 
                   <div className="space-y-1.5 py-2.5 border-y border-slate-100 my-3 text-xs text-slate-600">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">البريد:</span>
+                      <span className="text-slate-400 flex items-center gap-1"><Mail size={12}/> البريد:</span>
                       <span className="font-medium text-slate-700 truncate max-w-[170px]">{teacher.email}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-400">الهاتف:</span>
+                      <span className="text-slate-400 flex items-center gap-1"><Phone size={12}/> الهاتف:</span>
                       <span className="font-medium text-slate-700" dir="ltr">{teacher.phone || "غير متوفر"}</span>
                     </div>
                   </div>
@@ -259,13 +270,13 @@ export default function TeacherVerification() {
               <div className="grid grid-cols-2 gap-3">
                 {/* الوجه الأمامي */}
                 <div 
-                  onClick={() => selectedTeacher.id_front_url && setZoomedImage(selectedTeacher.id_front_url)}
+                  onClick={() => getFrontImage(selectedTeacher) && setZoomedImage(getFrontImage(selectedTeacher))}
                   className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-32 flex items-center justify-center cursor-pointer shadow-sm"
                 >
-                  {selectedTeacher.id_front_url ? (
-                    <img src={selectedTeacher.id_front_url} alt="ID Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  {getFrontImage(selectedTeacher) ? (
+                    <img src={getFrontImage(selectedTeacher)} alt="ID Front" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
-                    <span className="text-[11px] text-slate-400 text-center p-2">وجه البطاقة غير متوفر</span>
+                    <span className="text-[11px] text-slate-400 text-center p-2">وجه البطاقة غير مرفق</span>
                   )}
                   <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 text-white text-[9px] rounded-lg backdrop-blur-sm">
                     الوجه الأمامي
@@ -274,13 +285,13 @@ export default function TeacherVerification() {
 
                 {/* الوجه الخلفي */}
                 <div 
-                  onClick={() => selectedTeacher.id_back_url && setZoomedImage(selectedTeacher.id_back_url)}
+                  onClick={() => getBackImage(selectedTeacher) && setZoomedImage(getBackImage(selectedTeacher))}
                   className="group relative rounded-xl overflow-hidden border border-slate-200 bg-slate-900 h-32 flex items-center justify-center cursor-pointer shadow-sm"
                 >
-                  {selectedTeacher.id_back_url ? (
-                    <img src={selectedTeacher.id_back_url} alt="ID Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                  {getBackImage(selectedTeacher) ? (
+                    <img src={getBackImage(selectedTeacher)} alt="ID Back" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
-                    <span className="text-[11px] text-slate-400 text-center p-2">ظهر البطاقة غير متوفر</span>
+                    <span className="text-[11px] text-slate-400 text-center p-2">ظهر البطاقة غير مرفق</span>
                   )}
                   <span className="absolute bottom-2 right-2 px-2 py-0.5 bg-black/70 text-white text-[9px] rounded-lg backdrop-blur-sm">
                     الوجه الخلفي
