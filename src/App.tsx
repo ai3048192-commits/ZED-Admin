@@ -12,6 +12,7 @@ import SupportContact from "./pages/SupportContact";
 import AdminPackages from "./pages/AdminPackages";
 import AdminSettings from "./pages/AdminSettings";
 import TeacherRegistration from "./pages/TeacherRegistration";
+import UserPermissions from "./pages/UserPermissions";
 
 import "./index.css";
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
                 path="/admin-notifications"
                 element={<AdminNotifications />}
               />
+              <Route path="/user-permissions" element={<UserPermissions />} />
 
               <Route
                 path="/admin-teacher-verification"
